@@ -29,3 +29,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+    volumes:
+      - ./certs/ca-certificate.crt:/app/certs/ca-certificate.crt:ro
