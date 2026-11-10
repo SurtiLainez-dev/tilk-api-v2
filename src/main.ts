@@ -40,6 +40,7 @@ async function bootstrap() {
       'http://127.0.0.1:3000',
       'https://app.tilk.cloud',
       'https://test.app.tilk.cloud',
+      'https://app.tilk.cloud',
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
