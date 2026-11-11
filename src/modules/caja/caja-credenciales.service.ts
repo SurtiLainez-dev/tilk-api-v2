@@ -40,7 +40,7 @@ export class CajaCredencialesService {
     // GENERAR PIN ALEATORIO DE 6 DÍGITOS
     // ==========================================
     private generarPin(): string {
-        return randomInt(0, 1_000_000)
+        return randomInt(0, 100_00)
             .toString()
             .padStart(5, '0');
     }
