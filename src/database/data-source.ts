@@ -1,3 +1,4 @@
+
 import 'reflect-metadata';
 import 'dotenv/config';
 
@@ -43,7 +44,9 @@ export default new DataSource({
     entities: registeredEntities,
 
     migrations: [
-        'src/database/migrations/*.ts',
+        process.env.NODE_ENV === 'production'
+            ? 'dist/database/migrations/*.js'
+            : 'src/database/migrations/*.ts',
     ],
 
     migrationsTableName: 'nest_migrations',
