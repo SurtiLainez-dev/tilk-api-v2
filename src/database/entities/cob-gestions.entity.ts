@@ -35,7 +35,7 @@ export class CobGestions {
   @Column({ name: "intereses", type: "double", precision: 9, scale: 2, comment: "saldo de intereses del capital" })
   intereses!: number;
 
-  @Column({ name: "saldo_abonado", type: "double", precision: 9, scale: 2, comment: "Es el saldo abonado del cliente" })
+  @Column({ name: "saldo_abonado", type: "double", precision: 9, scale: 2, comment: "Es el saldo abonado del clientes" })
   saldo_abonado!: number;
 
   @Column({ name: "pagando", type: "double", precision: 9, scale: 2, comment: "Es el total de todas las cuotas sin mora" })

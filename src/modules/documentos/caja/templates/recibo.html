@@ -1,0 +1,437 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Recibo {{CODIGO}}</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            margin: 0;
+            padding: 0;
+            background: #fff;
+        }
+
+        body {
+            width: 80mm;
+            margin: 0;
+            padding: 3mm;
+            background: #fff;
+            color: #111;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 11px;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        .encabezado {
+            text-align: center;
+        }
+
+        .empresa {
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
+
+        .sucursal-codigo {
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .sucursal-nombre {
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        .sucursal-datos {
+            font-size: 10px;
+            line-height: 1.45;
+            margin-top: 3px;
+        }
+
+        .titulo-recibo {
+            font-size: 17px;
+            font-weight: 800;
+            margin-top: 13px;
+        }
+
+        .codigo-recibo {
+            font-size: 15px;
+            font-weight: 800;
+            margin-top: 3px;
+        }
+
+        .referencia {
+            font-size: 10px;
+            margin-top: 3px;
+        }
+
+        .separador {
+            border-top: 1px dashed #555;
+            margin: 10px 0;
+        }
+
+        .datos {
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        .dato {
+            margin: 2px 0;
+            overflow-wrap: anywhere;
+        }
+
+        .etiqueta {
+            font-weight: bold;
+        }
+
+        .seccion-titulo {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 7px;
+        }
+
+        .fila {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+            margin: 5px 0;
+        }
+
+        .fila span:first-child {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .fila span:last-child {
+            flex-shrink: 0;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .movimiento {
+            font-size: 11px;
+            margin: 7px 0;
+        }
+
+        .total {
+            font-size: 16px;
+            font-weight: 800;
+            margin: 9px 0;
+        }
+
+        .desglose {
+            font-size: 10px;
+        }
+
+        .saldo {
+            font-size: 11px;
+        }
+
+        .letras {
+            text-align: center;
+            margin: 12px 0;
+        }
+
+        .letras-titulo {
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .letras-contenido {
+            font-size: 11px;
+            margin-top: 5px;
+            text-transform: uppercase;
+            overflow-wrap: anywhere;
+        }
+
+        .qr {
+            text-align: center;
+            margin-top: 12px;
+        }
+
+        .qr img {
+            display: block;
+            width: 38mm;
+            height: 38mm;
+            object-fit: contain;
+            margin: 0 auto;
+        }
+
+        .qr-token-titulo {
+            font-size: 10px;
+            font-weight: bold;
+            margin-top: 7px;
+        }
+
+        .qr-token {
+            font-family: Arial, sans-serif;
+            font-size: 9px;
+            line-height: 1.4;
+            overflow-wrap: anywhere;
+            word-break: break-all;
+            margin-top: 4px;
+        }
+
+        .verificacion {
+            font-size: 10px;
+            line-height: 1.45;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .pie {
+            text-align: center;
+            font-size: 10px;
+            line-height: 1.5;
+            margin-top: 12px;
+        }
+
+        .agradecimiento {
+            font-weight: bold;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .correo-sac {
+            font-weight: bold;
+            overflow-wrap: anywhere;
+        }
+
+        .bendicion {
+            font-size: 13px;
+            font-weight: bold;
+            margin-top: 12px;
+        }
+
+        .generacion {
+            font-size: 9px;
+            margin-top: 10px;
+            color: #444;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- ENCABEZADO DE LA EMPRESA -->
+
+<div class="encabezado">
+
+    <div class="empresa">
+        {{EMPRESA}}
+    </div>
+
+    <div class="sucursal-codigo">
+        [{{SUCURSAL_CODIGO}}]
+    </div>
+
+    <div class="sucursal-nombre">
+        {{SUCURSAL}}
+    </div>
+
+    <div class="sucursal-datos">
+        <div>{{SUCURSAL_DIRECCION}}</div>
+        <div>
+            TELÉFONO: {{SUCURSAL_TELEFONO}}
+        </div>
+        <div>
+            CORREO: {{SUCURSAL_EMAIL}}
+        </div>
+    </div>
+
+    <div class="titulo-recibo">
+        RECIBO
+    </div>
+
+    <div class="codigo-recibo">
+        {{CODIGO}}
+    </div>
+
+</div>
+
+<div class="separador"></div>
+
+<!-- FECHA, CAJA Y USUARIO -->
+
+<div class="datos">
+
+    <div class="dato">
+        <span class="etiqueta">
+            FECHA Y HORA:
+        </span>
+        {{FECHA}} {{HORA}}
+    </div>
+
+    <div class="dato">
+        <span class="etiqueta">
+            CÓDIGO DE CAJA:
+        </span>
+        {{CAJA}}
+    </div>
+
+    <div class="dato">
+        <span class="etiqueta">
+            USUARIO:
+        </span>
+        {{USUARIO}}
+    </div>
+
+</div>
+
+<div class="separador"></div>
+
+<!-- INFORMACIÓN DE LA CUENTA -->
+
+<div class="datos">
+
+    <div class="dato">
+        <span class="etiqueta">
+            CUENTA:
+        </span>
+        {{CUENTA}}
+    </div>
+
+    <div class="dato">
+        <span class="etiqueta">
+            CLIENTE:
+        </span>
+        {{CLIENTE}}
+    </div>
+
+    <div class="dato">
+        <span class="etiqueta">
+            OBSERVACIÓN:
+        </span>
+        {{COMENTARIO}}
+    </div>
+
+</div>
+
+<div class="separador"></div>
+
+<!-- DETALLE DEL PAGO -->
+
+<div class="seccion-titulo">
+    DETALLE DEL PAGO
+</div>
+
+{{MOVIMIENTOS}}
+
+<div class="separador"></div>
+
+<!-- TOTAL PAGADO -->
+
+<div class="fila total">
+    <span>TOTAL PAGADO</span>
+    <span>L {{TOTAL}}</span>
+</div>
+
+<div class="fila desglose">
+    <span>Capital abonado</span>
+    <span>L {{TOTAL_CAPITAL}}</span>
+</div>
+
+<div class="fila desglose">
+    <span>Mora abonada</span>
+    <span>L {{TOTAL_MORA}}</span>
+</div>
+
+<div class="separador"></div>
+
+<!-- SALDOS -->
+
+<div class="fila saldo">
+    <span>Saldo anterior</span>
+    <span>L {{SALDO_ANTERIOR}}</span>
+</div>
+
+<div class="fila saldo">
+    <span>Nuevo saldo</span>
+    <span>L {{SALDO_NUEVO}}</span>
+</div>
+
+<div class="separador"></div>
+
+<!-- CANTIDAD EN LETRAS -->
+
+<div class="letras">
+
+    <div class="letras-titulo">
+        CANTIDAD EN LETRAS
+    </div>
+
+    <div class="letras-contenido">
+        {{MONTO_LETRAS}}
+    </div>
+
+</div>
+
+<div class="separador"></div>
+
+<!-- CÓDIGO QR -->
+
+<div class="qr">
+
+    <img
+            src="{{QR_IMAGEN}}"
+            alt="Código QR de verificación"
+    >
+
+    <div class="qr-token-titulo">
+        TOKEN DE VERIFICACIÓN
+    </div>
+
+    <div class="qr-token">
+        {{QR_TOKEN}}
+    </div>
+
+    <div class="verificacion">
+        Este recibo puede ser autenticado
+        mediante el código QR para comprobar
+        su originalidad y verificar que no
+        ha sido falsificado.
+    </div>
+
+</div>
+
+<div class="separador"></div>
+
+<!-- MENSAJES FINALES -->
+
+<div class="pie">
+
+    <div class="agradecimiento">
+        ¡GRACIAS POR SU VISITA!
+    </div>
+
+    <div>
+        Para cualquier queja o sugerencia,
+        puede escribirnos a:
+    </div>
+
+    <div class="correo-sac">
+        sac@grupolainez.com
+    </div>
+
+    <div class="bendicion">
+        ¡QUE DIOS LO BENDIGA!
+    </div>
+
+    <div class="generacion">
+        Documento generado:
+        {{FECHA_GENERACION}}
+    </div>
+
+</div>
+
+</body>
+</html>

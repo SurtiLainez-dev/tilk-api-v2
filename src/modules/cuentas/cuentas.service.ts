@@ -2,10 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { ConsultarCuentasDto} from "./dto/consultar-cuentas.dto.js";
-
-// Ajustar según la ubicación real de tus entidades
-import { VentasEntity, Clientes} from "../../database/entities/index.js";
+import { ConsultarCuentasDto } from './dto/consultar-cuentas.dto.js';
+import { VentasEntity, Clientes } from '../../database/entities/index.js';
 
 export interface CuentaPendiente {
     slug: string;
@@ -24,61 +22,47 @@ export class CuentasService {
         private readonly ventasRepository: Repository<VentasEntity>,
     ) {}
 
-    async obtenerCuentasPendientes(
-        filtros: ConsultarCuentasDto,
-    ) {
+    async obtenerCuentasPendientes(filtros: ConsultarCuentasDto) {
         const pagina = filtros.pagina ?? 1;
         const limite = filtros.limite ?? 20;
-
         const offset = (pagina - 1) * limite;
 
         const query = this.ventasRepository
             .createQueryBuilder('venta')
-            .innerJoin(
-                Clientes,
-                'cliente',
-                'cliente.id = venta.cliente_id',
-            )
-            .where('venta.estado IN (:...estados)', {
-                estados: [1, 2],
-            })
-            .andWhere('venta.saldo_actual > :saldo', {
-                saldo: 0,
-            })
+            .innerJoin(Clientes, 'cliente', 'cliente.id = venta.cliente_id')
+            .where('venta.estado IN (:...estados)', { estados: [1, 2] })
+            .andWhere('venta.saldo_actual > :saldo', { saldo: 0 })
             .andWhere('venta.slug IS NOT NULL')
             .andWhere("venta.slug <> ''");
 
-        // Buscar por venta o información del cliente
+        // Buscar por venta o información del cliente.
         if (filtros.buscar?.trim()) {
             const buscar = `%${filtros.buscar.trim()}%`;
 
-            query.andWhere(
-                `(
-          venta.cod LIKE :buscar
-          OR cliente.nombres LIKE :buscar
-          OR cliente.apellidos LIKE :buscar
-          OR cliente.identidad LIKE :buscar
-          OR CONCAT(
-            cliente.nombres,
-            ' ',
-            COALESCE(cliente.apellidos, '')
-          ) LIKE :buscar
-        )`,
-                { buscar },
-            );
+            query.andWhere(`
+                (
+                    venta.cod LIKE :buscar
+                    OR cliente.nombres LIKE :buscar
+                    OR cliente.apellidos LIKE :buscar
+                    OR cliente.identidad LIKE :buscar
+                    OR CONCAT(
+                        cliente.nombres,
+                        ' ',
+                        COALESCE(cliente.apellidos, '')
+                    ) LIKE :buscar
+                )
+            `, { buscar });
         }
 
-        // Filtrar por estado específico
+        // Filtrar por estado específico.
         if (filtros.estado !== undefined) {
-            query.andWhere('venta.estado = :estado', {
-                estado: filtros.estado,
-            });
+            query.andWhere('venta.estado = :estado', { estado: filtros.estado });
         }
 
-        const total = await query
-            .clone()
-            .getCount();
+        // Obtener total de registros.
+        const total = await query.clone().getCount();
 
+        // Obtener cuentas pendientes.
         const resultados = await query
             .select('venta.slug', 'slug')
             .addSelect('venta.cod', 'cod')
@@ -101,17 +85,15 @@ export class CuentasService {
                 saldo_actual: string | number;
             }>();
 
-        const cuentas: CuentaPendiente[] = resultados.map(
-            (cuenta) => ({
-                slug: cuenta.slug,
-                cod: cuenta.cod,
-                nombres: cuenta.nombres,
-                apellidos: cuenta.apellidos,
-                identidad: cuenta.identidad,
-                estado: Number(cuenta.estado),
-                saldo_actual: Number(cuenta.saldo_actual),
-            }),
-        );
+        const cuentas: CuentaPendiente[] = resultados.map(cuenta => ({
+            slug: cuenta.slug,
+            cod: cuenta.cod,
+            nombres: cuenta.nombres,
+            apellidos: cuenta.apellidos,
+            identidad: cuenta.identidad,
+            estado: Number(cuenta.estado),
+            saldo_actual: Number(cuenta.saldo_actual),
+        }));
 
         return {
             success: true,

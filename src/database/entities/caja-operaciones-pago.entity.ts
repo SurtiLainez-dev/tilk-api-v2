@@ -6,92 +6,105 @@ import {
     Index,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
-} from 'typeorm'
+} from 'typeorm';
 
 export type EstadoOperacionPago =
+    | 'PENDIENTE'
     | 'PROCESANDO'
     | 'COMPLETADO'
+    | 'ERROR'
+    | 'CERRADO';
 
 @Entity({ name: 'caja_operaciones_pago' })
-@Index('uq_caja_operacion_uuid', ['operacion_id'], { unique: true })
-@Index('uq_caja_operacion_recibo', ['recibo_id'], { unique: true })
+@Index('uq_caja_operacion_uuid', ['operacion_id'], {
+    unique: true,
+})
+@Index('uq_caja_operacion_recibo', ['recibo_id'], {
+    unique: true,
+})
 @Index('idx_caja_operacion_venta', ['venta_id'])
 @Index('idx_caja_operacion_caja', ['caja_id'])
 @Index('idx_caja_operacion_usuario', ['user_id'])
 @Index('idx_caja_operacion_estado', ['estado', 'created_at'])
 export class CajaOperacionPago {
+
     @PrimaryGeneratedColumn({
         type: 'bigint',
         unsigned: true,
     })
-    id!: string
+    id!: string;
 
     @Column({
-        type: 'char',
+        type: 'varchar',
         length: 36,
     })
-    operacion_id!: string
+    operacion_id!: string;
 
     @Column({
         type: 'bigint',
         unsigned: true,
     })
-    venta_id!: string
+    venta_id!: string;
 
     @Column({
         type: 'bigint',
         unsigned: true,
     })
-    caja_id!: string
+    caja_id!: string;
 
     @Column({
         type: 'bigint',
         unsigned: true,
     })
-    user_id!: string
+    user_id!: string;
 
     @Column({
         type: 'bigint',
         unsigned: true,
         nullable: true,
     })
-    recibo_id!: string | null
+    recibo_id!: string | null;
 
     @Column({
         type: 'decimal',
-        precision: 14,
+        precision: 15,
         scale: 2,
     })
-    monto!: string
+    monto!: string;
 
     @Column({
-        type: 'enum',
-        enum: ['PROCESANDO', 'COMPLETADO'],
-        default: 'PROCESANDO',
+        type: 'varchar',
+        length: 30,
+        default: 'PENDIENTE',
     })
-    estado!: EstadoOperacionPago
+    estado!: EstadoOperacionPago;
 
     @Column({
         type: 'char',
         length: 64,
-    })
-    request_hash!: string
-
-    @Column({
-        type: 'json',
         nullable: true,
     })
-    respuesta!: Record<string, unknown> | null
+    request_hash!: string | null;
+
+    @Column({
+        type: 'longtext',
+        nullable: true,
+    })
+    respuesta!: string | null;
+
+    @Column({
+        type: 'text',
+        nullable: true,
+    })
+    error!: string | null;
 
     @CreateDateColumn({
-        type: 'timestamp',
-        precision: 6,
+        type: 'datetime',
     })
-    created_at!: Date
+    created_at!: Date;
 
     @UpdateDateColumn({
-        type: 'timestamp',
-        precision: 6,
+        type: 'datetime',
     })
-    updated_at!: Date
+    updated_at!: Date;
 }

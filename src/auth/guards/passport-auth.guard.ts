@@ -5,6 +5,7 @@ import type { Request } from 'express';
 
 import {AuthService, type AuthenticatedUser,} from '../auth.service.js';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
+import { WHATSAPP_AUTH_KEY } from '../../modules/whatsapp/decorators/whatsapp-auth.decorator.js';
 
 export interface AuthenticatedRequest extends Request {user: AuthenticatedUser;}
 
@@ -22,6 +23,15 @@ export class PassportAuthGuard implements CanActivate {
         );
 
         if (isPublic) {
+            return true;
+        }
+
+        const esWhatsapp = this.reflector.getAllAndOverride<boolean>(
+            WHATSAPP_AUTH_KEY,
+            [context.getHandler(), context.getClass()],
+        );
+
+        if (esWhatsapp) {
             return true;
         }
 
@@ -51,4 +61,6 @@ export class PassportAuthGuard implements CanActivate {
 
         return true;
     }
+
+
 }

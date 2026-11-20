@@ -228,43 +228,34 @@ export class CuentasDetalleService {
         }));
     }
 
+
     private async obtenerCliente(clienteId: string) {
-        const rows = await this.db.query(
-            `
-      SELECT
-        c.slug,
-        c.nombres,
-        c.apellidos,
-        c.identidad,
-        c.rating,
-        c.email,
-        lc.monto_aprobado,
-        lc.monto_disponible,
-        lc.monto_utilizado,
-        lc.estado AS estado_credito,
-        lc.fecha_vencimiento AS vencimiento_credito
-      FROM clientes c
-      LEFT JOIN limite_credito_clientes lc
-        ON lc.id = (
-          SELECT l2.id
-          FROM limite_credito_clientes l2
-          WHERE l2.cliente_id = c.id
-            AND l2.es_actual = 1
-            AND l2.estado = 'ACTIVO'
-          ORDER BY l2.id DESC
-          LIMIT 1
+        const rows = await this.db.query(`
+        SELECT
+            c.slug, c.nombres, c.apellidos, c.identidad, c.rating,
+            c.email AS email,
+            tc.cod_pais AS telefono_cod_pais,
+            tc.tel AS telefono,
+            tc.detalle AS telefono_detalle,
+            lc.monto_aprobado, lc.monto_disponible, lc.monto_utilizado,
+            lc.estado AS estado_credito,
+            lc.fecha_vencimiento AS vencimiento_credito
+        FROM clientes c
+        LEFT JOIN telefonos_clientes tc ON tc.id = (
+            SELECT t.id FROM telefonos_clientes t
+            WHERE t.cliente_id = c.id AND t.is_principal = 1
+            ORDER BY t.id DESC LIMIT 1
         )
-      WHERE c.id = ?
-      LIMIT 1
-      `,
-            [clienteId],
-        );
+        LEFT JOIN limite_credito_clientes lc ON lc.id = (
+            SELECT l2.id FROM limite_credito_clientes l2
+            WHERE l2.cliente_id = c.id AND l2.es_actual = 1 AND l2.estado = 'ACTIVO'
+            ORDER BY l2.id DESC LIMIT 1
+        )
+        WHERE c.id = ? LIMIT 1
+    `, [clienteId]);
 
         const c = rows[0];
-
-        if (!c) {
-            return null;
-        }
+        if (!c) return null;
 
         return {
             slug: c.slug,
@@ -273,17 +264,21 @@ export class CuentasDetalleService {
             identidad: c.identidad,
             rating: c.rating,
             email: c.email,
-            credito: c.estado_credito
-                ? {
-                    estado: c.estado_credito,
-                    aprobado: this.dinero(c.monto_aprobado),
-                    disponible: this.dinero(c.monto_disponible),
-                    utilizado: this.dinero(c.monto_utilizado),
-                    fecha_vencimiento: c.vencimiento_credito,
-                }
-                : null,
+            telefono_principal: c.telefono ? {
+                cod_pais: String(c.telefono_cod_pais ?? ''),
+                numero: String(c.telefono),
+                detalle: c.telefono_detalle,
+            } : null,
+            credito: c.estado_credito ? {
+                estado: c.estado_credito,
+                aprobado: this.dinero(c.monto_aprobado),
+                disponible: this.dinero(c.monto_disponible),
+                utilizado: this.dinero(c.monto_utilizado),
+                fecha_vencimiento: c.vencimiento_credito,
+            } : null,
         };
     }
+
 
     async detalle(slug: string) {
         const venta = await this.obtenerVenta(slug);
@@ -540,3 +535,4 @@ export class CuentasDetalleService {
         };
     }
 }
+

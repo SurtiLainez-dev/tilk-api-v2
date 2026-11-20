@@ -26,7 +26,7 @@ export class CarritoCompras {
   @Column({ name: "tipo", type: "enum", enum: ["CREDITO", "CONTADO"], default: "CREDITO" })
   tipo!: string;
 
-  @Column({ name: "origen", type: "enum", enum: ["VENDEDOR", "CLIENTE_PORTAL"], default: "VENDEDOR", comment: "Indica si fue creado por un vendedor o por el portal del cliente" })
+  @Column({ name: "origen", type: "enum", enum: ["VENDEDOR", "CLIENTE_PORTAL"], default: "VENDEDOR", comment: "Indica si fue creado por un vendedor o por el portal del clientes" })
   origen!: string;
 
   @Column({ name: "subtotal", type: "decimal", precision: 12, scale: 2, default: "0.00", comment: "Subtotal antes de descuentos" })

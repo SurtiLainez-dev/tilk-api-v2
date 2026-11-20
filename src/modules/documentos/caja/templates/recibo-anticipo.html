@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+
+    <title>Anticipo {{CODIGO}}</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            margin: 0;
+            padding: 0;
+            background: #fff;
+        }
+
+        body {
+            width: 80mm;
+            margin: 0;
+            padding: 3mm;
+            background: #fff;
+            color: #111;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 11px;
+            line-height: 1.4;
+            overflow-wrap: anywhere;
+        }
+
+        .encabezado {
+            text-align: center;
+        }
+
+        .empresa {
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
+
+        .sucursal-codigo {
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .sucursal-nombre {
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 3px;
+        }
+
+        .sucursal-datos {
+            font-size: 10px;
+            line-height: 1.4;
+            margin-top: 4px;
+        }
+
+        .documento {
+            text-align: center;
+            margin-top: 13px;
+        }
+
+        .titulo-documento {
+            font-size: 15px;
+            font-weight: 800;
+        }
+
+        .codigo {
+            font-size: 15px;
+            font-weight: 800;
+            margin-top: 3px;
+        }
+
+        .separador {
+            border-top: 1px dashed #444;
+            margin: 10px 0;
+        }
+
+        .total {
+            text-align: center;
+            padding: 5px 0;
+        }
+
+        .total-titulo {
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .total-monto {
+            font-size: 29px;
+            font-weight: 800;
+            line-height: 1.2;
+            margin: 5px 0;
+        }
+
+        .monto-letras {
+            font-size: 10px;
+            text-transform: uppercase;
+            margin-top: 5px;
+        }
+
+        .seccion-titulo {
+            font-size: 11px;
+            font-weight: 800;
+            margin-bottom: 7px;
+        }
+
+        .dato {
+            margin: 3px 0;
+            line-height: 1.45;
+        }
+
+        .etiqueta {
+            font-weight: bold;
+        }
+
+        .nota-credito {
+            border: 1px solid #222;
+            padding: 7px;
+            margin: 10px 0 2px;
+            text-align: center;
+        }
+
+        .nota-titulo {
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .nota-codigo {
+            font-size: 14px;
+            font-weight: 800;
+            margin-top: 3px;
+        }
+
+        .nota-fecha {
+            font-size: 10px;
+            margin-top: 4px;
+        }
+
+        .politicas {
+            font-size: 10px;
+            line-height: 1.45;
+            text-align: left;
+        }
+
+        .politicas ol {
+            margin: 0;
+            padding-left: 16px;
+        }
+
+        .politicas li {
+            padding-left: 2px;
+            margin-bottom: 6px;
+        }
+
+        .qr {
+            text-align: center;
+            margin-top: 6px;
+        }
+
+        .qr img {
+            display: block;
+            width: 35mm;
+            height: 35mm;
+            object-fit: contain;
+            margin: 0 auto;
+        }
+
+        .qr-texto {
+            font-size: 10px;
+            margin: 5px 0;
+            line-height: 1.4;
+        }
+
+        .qr-token {
+            font-size: 8px;
+            overflow-wrap: anywhere;
+            word-break: break-all;
+            margin-top: 5px;
+        }
+
+        .pie {
+            text-align: center;
+            font-size: 10px;
+            line-height: 1.5;
+        }
+
+        .agradecimiento {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 7px;
+        }
+
+        .bendicion {
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+
+        .generacion {
+            font-size: 8px;
+            color: #555;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- ENCABEZADO -->
+
+<div class="encabezado">
+
+    <div class="empresa">
+        {{EMPRESA}}
+    </div>
+
+    <div class="sucursal-codigo">
+        [{{SUCURSAL_CODIGO}}]
+    </div>
+
+    <div class="sucursal-nombre">
+        {{SUCURSAL}}
+    </div>
+
+    <div class="sucursal-datos">
+        <div>{{SUCURSAL_DIRECCION}}</div>
+
+        <div>
+            TELÉFONO: {{SUCURSAL_TELEFONO}}
+        </div>
+
+        <div>
+            CORREO: {{SUCURSAL_EMAIL}}
+        </div>
+    </div>
+
+</div>
+
+<div class="documento">
+
+    <div class="titulo-documento">
+        RECIBO DE ANTICIPO
+    </div>
+
+    <div class="codigo">
+        {{CODIGO}}
+    </div>
+
+</div>
+
+<div class="separador"></div>
+
+<!-- TOTAL PAGADO -->
+
+<div class="total">
+
+    <div class="total-titulo">
+        TOTAL PAGADO
+    </div>
+
+    <div class="total-monto">
+        L {{TOTAL}}
+    </div>
+
+    <div class="monto-letras">
+        {{MONTO_LETRAS}}
+    </div>
+
+</div>
+
+<div class="separador"></div>
+
+<!-- DETALLE DEL PAGO -->
+
+<div class="seccion-titulo">
+    DETALLE DEL PAGO
+</div>
+
+<div class="dato">
+    <span class="etiqueta">FECHA:</span>
+    {{FECHA}} {{HORA}}
+</div>
+
+<div class="dato">
+    <span class="etiqueta">CAJA:</span>
+    {{CAJA}}
+</div>
+
+<div class="dato">
+    <span class="etiqueta">USUARIO:</span>
+    {{USUARIO}}
+</div>
+
+<div class="dato">
+    <span class="etiqueta">CLIENTE:</span>
+    {{CLIENTE}}
+</div>
+
+<div class="dato">
+    <span class="etiqueta">IDENTIDAD:</span>
+    {{IDENTIDAD}}
+</div>
+
+<div class="dato">
+    <span class="etiqueta">FORMA DE PAGO:</span>
+    {{FORMA_PAGO}}
+</div>
+
+<div class="dato">
+    <span class="etiqueta">PROPÓSITO:</span>
+    {{PROPOSITO}}
+</div>
+
+<div class="dato">
+    <span class="etiqueta">CONCEPTO:</span>
+    {{COMENTARIO}}
+</div>
+
+<!-- NOTA DE CRÉDITO -->
+
+<div class="nota-credito">
+
+    <div class="nota-titulo">
+        NOTA DE CRÉDITO A SU FAVOR
+    </div>
+
+    <div class="nota-codigo">
+        {{NOTA_CREDITO}}
+    </div>
+
+    <div class="nota-fecha">
+        VENCIMIENTO: {{FECHA_VENCIMIENTO}}
+    </div>
+
+</div>
+
+<div class="separador"></div>
+
+<!-- POLÍTICAS -->
+
+<div class="seccion-titulo">
+    POLÍTICAS Y CONDICIONES
+</div>
+
+<div class="politicas">
+
+    <ol>
+        <li>
+            {{POLITICA_USO}}
+        </li>
+
+        <li>
+            Este documento constituye un comprobante
+            de la nota de crédito emitida a su favor
+            por Surtidora Laínez.
+        </li>
+
+        <li>
+            La nota de crédito tiene una vigencia de
+            seis (6) meses a partir de su fecha de
+            emisión, conforme a las condiciones y
+            disposiciones legales aplicables.
+        </li>
+
+        <li>
+            Si solicita trasladar este saldo a otro
+            cliente, se aplicará un cargo administrativo
+            de L 50.00, el cual será deducido del saldo
+            disponible, previa autorización del titular.
+        </li>
+
+        <li>
+            Para utilizar o trasladar el saldo se
+            deberá verificar la identidad del titular
+            y la disponibilidad del saldo en nuestro
+            sistema.
+        </li>
+
+        <li>
+            El saldo podrá aplicarse de forma parcial
+            o total, de acuerdo con el propósito
+            del anticipo.
+        </li>
+
+        <li>
+            Este comprobante no sustituye una factura
+            de venta ni acredita por sí mismo la entrega
+            de mercancías o servicios.
+        </li>
+
+        <li>
+            Conserve este comprobante y comunique
+            cualquier diferencia a nuestro departamento
+            de Servicio al Cliente.
+        </li>
+    </ol>
+
+</div>
+
+<div class="separador"></div>
+
+<!-- VERIFICACIÓN QR -->
+
+<!--<div class="qr">-->
+
+<!--    <div class="seccion-titulo">-->
+<!--        VERIFICACIÓN DEL DOCUMENTO-->
+<!--    </div>-->
+
+<!--    <img-->
+<!--            src="{{QR_IMAGEN}}"-->
+<!--            alt="Código QR de verificación"-->
+<!--    >-->
+
+<!--    <div class="qr-texto">-->
+<!--        Escanee este código QR para verificar-->
+<!--        la autenticidad y originalidad del-->
+<!--        comprobante.-->
+<!--    </div>-->
+
+<!--    <div class="qr-token">-->
+<!--        {{QR_TOKEN}}-->
+<!--    </div>-->
+
+<!--</div>-->
+
+<!--<div class="separador"></div>-->
+
+<!-- PIE DEL DOCUMENTO -->
+
+<div class="pie">
+
+    <div class="agradecimiento">
+        ¡GRACIAS POR SU CONFIANZA!
+    </div>
+
+    <div>
+        Para consultas, quejas o sugerencias:
+    </div>
+
+    <strong>
+        sac@grupolainez.com
+    </strong>
+
+    <div class="bendicion">
+        ¡QUE DIOS LO BENDIGA!
+    </div>
+
+    <div class="generacion">
+        Documento generado: {{FECHA_GENERACION}}
+    </div>
+
+</div>
+
+</body>
+</html>

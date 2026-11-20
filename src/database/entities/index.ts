@@ -257,4 +257,6 @@ export * from './web-top20-articulos.entity.js';
 export * from './websockets-statistics-entries.entity.js';
 export * from './caja-sesiones.entity.js';
 export * from './caja-sesiones-dispositivos.entity.js';
-export * from './caja-operaciones-pago.entity.js'
+export * from './caja-operaciones-pago.entity.js';
+export * from './nota-credito-cliente-aplicaciones.entity.js';
+export * from './nota-credito-cliente-contadores.entitys.js';

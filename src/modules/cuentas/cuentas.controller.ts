@@ -76,7 +76,7 @@ export class CuentasController {
     @ApiOperation({
         summary: 'Consultar detalle completo de una cuenta',
         description:
-            'Obtiene información del cliente, límite de crédito activo, ' +
+            'Obtiene información del clientes, límite de crédito activo, ' +
             'datos de la venta, artículos y saldos calculados.',
     })
     @ApiParam({

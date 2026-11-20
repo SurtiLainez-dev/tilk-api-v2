@@ -38,6 +38,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:3000',
       'http://127.0.0.1:3000',
+      'http://127.0.0.1:3100',
       'https://app.tilk.cloud',
       'https://test.app.tilk.cloud',
       'https://app.tilk.cloud',
@@ -49,6 +50,7 @@ async function bootstrap() {
       'Accept',
       'X-Tilk-Client',
       'X-Frontend-Path',
+      'X-Caja-Token',
     ],
     credentials: true,
   });

@@ -9,6 +9,10 @@
       {
         "include": "common/mail/templates/**/*.html",
         "outDir": "dist"
+      },
+      {
+        "include": "modules/documentos/caja/templates/**/*.html",
+        "outDir": "dist"
       }
     ],
     "watchAssets": true
