@@ -196,11 +196,6 @@ export class CarritosGuardarService {
         const articulo = articulos[0];
         const articuloId = String(articulo.id);
 
-        if (Number(articulo.is_motocicleta) === 1) {
-            throw new BadRequestException(
-                'Las motocicletas no están habilitadas para esta venta.',
-            );
-        }
 
         const precios = await manager.query(
             `
@@ -236,34 +231,49 @@ export class CarritosGuardarService {
         }
 
         // Bloqueamos las filas de stock durante la transacción.
+
+// Bloqueamos las filas de stock durante la transacción.
         const stock = await manager.query(
             `
-            SELECT
-                id,
-                stock_actual
-            FROM stock_articulos
-            WHERE sucursal_id = ?
-              AND articulo_id = ?
-            FOR UPDATE
+                SELECT
+                    id,
+                    stock_actual,
+                    stock_consignado
+                FROM stock_articulos
+                WHERE sucursal_id = ?
+                  AND articulo_id = ?
+                    FOR UPDATE
             `,
             [sucursalId, articuloId],
         );
 
+        const esMotocicleta = Number(articulo.is_motocicleta) === 1;
+
         const disponible = stock.reduce(
             (
                 total: number,
-                fila: { stock_actual: string | number },
+                fila: {
+                    stock_actual: string | number;
+                    stock_consignado: string | number;
+                },
             ) => {
-                const cantidad = Number(fila.stock_actual);
+                const stockActual = Number(fila.stock_actual ?? 0);
+                const stockConsignado = Number(fila.stock_consignado ?? 0);
 
-                return total + (
-                    Number.isFinite(cantidad)
-                        ? Math.max(0, cantidad)
-                        : 0
-                );
+                const disponibleActual = Number.isFinite(stockActual)
+                    ? Math.max(0, stockActual)
+                    : 0;
+
+                const disponibleConsignado = Number.isFinite(stockConsignado)
+                    ? Math.max(0, stockConsignado)
+                    : 0;
+
+                return total + disponibleActual +
+                    (esMotocicleta ? disponibleConsignado : 0);
             },
             0,
         );
+
 
         if (linea.cantidad > disponible) {
             throw new ConflictException(

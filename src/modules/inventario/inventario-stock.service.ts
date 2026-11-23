@@ -24,32 +24,32 @@ export class InventarioStockService {
     async consultarPorSucursal(sucursalId: string) {
         const filas: StockFila[] = await this.dataSource.query(
             `
-      SELECT
-        a.id AS articulo_id,
-        a.slug,
-        a.nombre_articulo,
-        a.modelo,
-        a.codigo_sistema,
-        a.codigo_barras,
-        a.is_motocicleta,
-        SUM(sa.stock_actual) AS stock_actual
-      FROM stock_articulos sa
-      INNER JOIN articulos a
-        ON a.id = sa.articulo_id
-      WHERE sa.sucursal_id = ?
-        AND sa.stock_actual > 0
-        AND a.slug IS NOT NULL
-        AND a.slug <> ''
-      GROUP BY
-        a.id,
-        a.slug,
-        a.nombre_articulo,
-        a.modelo,
-        a.codigo_sistema,
-        a.codigo_barras,
-        a.is_motocicleta
-      ORDER BY a.nombre_articulo ASC
-      `,
+                SELECT
+                    a.id AS articulo_id,
+                    a.slug,
+                    a.nombre_articulo,
+                    a.modelo,
+                    a.codigo_sistema,
+                    a.codigo_barras,
+                    a.is_motocicleta,
+                    SUM(sa.stock_actual) AS stock_actual
+                FROM stock_articulos sa
+                         INNER JOIN articulos a
+                                    ON a.id = sa.articulo_id
+                WHERE sa.sucursal_id = ?
+                  AND sa.stock_actual > 0
+                  AND a.slug IS NOT NULL
+                  AND a.slug <> ''
+                GROUP BY
+                    a.id,
+                    a.slug,
+                    a.nombre_articulo,
+                    a.modelo,
+                    a.codigo_sistema,
+                    a.codigo_barras,
+                    a.is_motocicleta
+                ORDER BY a.nombre_articulo ASC
+            `,
             [sucursalId],
         );
 
@@ -57,10 +57,7 @@ export class InventarioStockService {
 
         const [precios, promociones] = await Promise.all([
             this.precioService.obtenerPreciosContado(ids),
-            this.precioService.obtenerPromocionesContado(
-                ids,
-                sucursalId,
-            ),
+            this.precioService.obtenerPromocionesContado(ids, sucursalId),
         ]);
 
         return {
@@ -75,10 +72,8 @@ export class InventarioStockService {
                     codigo_sistema: fila.codigo_sistema,
                     codigo_barras: fila.codigo_barras,
                     stock_actual: Number(fila.stock_actual),
-                    es_motocicleta:
-                        Number(fila.is_motocicleta) === 1,
-                    permite_venta_caja:
-                        Number(fila.is_motocicleta) !== 1,
+                    es_motocicleta: Number(fila.is_motocicleta) === 1,
+                    permite_venta_caja: Number(fila.is_motocicleta) !== 1,
                     precio: precios.get(articuloId) ?? null,
                     promociones: promociones.get(articuloId) ?? [],
                 };

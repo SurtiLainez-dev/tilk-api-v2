@@ -19,6 +19,10 @@ export interface CodigoDirectriz {
     directriz_id: string;
     contador_anterior: string;
     contador_generado: string;
+    contador_inicial: string;
+    contador_final: string;
+    contador_actual: string;
+    codigo_post_contador: string;
     cai: string | null;
     fecha_emision: string | Date | null;
     fecha_final: string | Date | null;
@@ -108,6 +112,10 @@ export class PostearCuentaDirectrizService {
                 directriz_id: directriz.id,
                 contador_anterior: directriz.contador_actual,
                 contador_generado: String(contadorGenerado),
+                contador_inicial: directriz.contador_inicial,
+                contador_final: directriz.contador_final,
+                contador_actual: directriz.contador_actual,
+                codigo_post_contador: directriz.codigo_post_contador,
                 cai: directriz.cai,
                 fecha_emision: directriz.fecha_emision,
                 fecha_final: directriz.fecha_final,

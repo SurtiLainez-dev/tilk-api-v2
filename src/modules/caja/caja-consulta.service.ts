@@ -200,52 +200,19 @@ export class CajaConsultaService {
     // CLASIFICACIÓN DE MOVIMIENTOS
     // ============================================
 
-    private clasificar(
-        tipoDocumento: number,
-        tipo: number,
-    ): ClasificacionMovimiento {
 
-        // ABONO DE CUENTA
-        if (
-            tipoDocumento === 2 &&
-            tipo === 0
-        ) {
-            return {
-                codigo: 'ABONO_CUENTA',
-                nombre: 'Recibo de abono de cuenta',
-                efecto: 'INGRESO',
-            };
-        }
+    private clasificar(tipoDocumento: number, tipo: number): ClasificacionMovimiento {
+        const documentos: Record<number, { codigo: string; nombre: string }> = {
+            1: { codigo: 'FACTURA_COMPRA', nombre: 'Factura de compra' },
+            2: { codigo: 'ABONO_CUENTA', nombre: 'Recibo de abono de cuenta' },
+            4: { codigo: 'EGRESO', nombre: 'Egreso de caja' },
+            5: { codigo: 'ANTICIPO_CLIENTE', nombre: 'Anticipo de cliente' },
+            6: { codigo: 'CIERRE_CAJA_CHICA', nombre: 'Cierre de caja chica' },
+        };
 
-        // EGRESO
-        if (
-            tipoDocumento === 4 &&
-            tipo === 1
-        ) {
-            return {
-                codigo: 'EGRESO',
-                nombre: 'Egreso de caja',
-                efecto: 'EGRESO',
-            };
-        }
+        const documento = documentos[tipoDocumento];
 
-        // FACTURA
-        if (
-            tipoDocumento === 1 &&
-            tipo === 0
-        ) {
-            return {
-                codigo: 'FACTURA_COMPRA',
-                nombre: 'Factura de compra',
-                efecto: 'INGRESO',
-            };
-        }
-
-        // CIERRE DE CAJA CHICA
-        if (
-            tipoDocumento === 6 &&
-            tipo === 0
-        ) {
+        if (tipoDocumento === 6 && tipo === 0) {
             return {
                 codigo: 'CIERRE_CAJA_CHICA',
                 nombre: 'Cierre de caja chica',
@@ -253,22 +220,29 @@ export class CajaConsultaService {
             };
         }
 
-        // DOCUMENTO 5
-        if (tipoDocumento === 5) {
+        if (tipo === 0) {
             return {
-                codigo: 'DOCUMENTO_5',
-                nombre: 'Pendiente de identificar',
-                efecto: 'PENDIENTE',
+                codigo: documento?.codigo ?? 'OTRO_INGRESO',
+                nombre: documento?.nombre ?? 'Otro ingreso de caja',
+                efecto: 'INGRESO',
             };
         }
 
-        // OTROS DOCUMENTOS
+        if (tipo === 1) {
+            return {
+                codigo: documento?.codigo ?? 'OTRO_EGRESO',
+                nombre: documento?.nombre ?? 'Otro egreso de caja',
+                efecto: 'EGRESO',
+            };
+        }
+
         return {
             codigo: 'NO_CLASIFICADO',
             nombre: 'Movimiento no clasificado',
             efecto: 'PENDIENTE',
         };
     }
+
 
     // ============================================
     // CONSULTAR CAJA POR SLUG

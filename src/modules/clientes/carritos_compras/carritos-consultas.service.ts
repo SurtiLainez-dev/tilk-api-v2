@@ -100,6 +100,10 @@ export class CarritosConsultasService {
                 : this.dataSource.query(sql, parametros);
         };
 
+        // ==========================================
+        // 1. CONSULTAR CARRITO
+        // ==========================================
+
         const carritos = await consultar(
             `
       SELECT
@@ -135,17 +139,23 @@ export class CarritosConsultasService {
 
         const carrito = carritos[0];
 
+        // ==========================================
+        // 2. ARTÍCULOS + REMISIÓN + MOTOCICLETA
+        // ==========================================
+
         const lineas = await consultar(
             `
       SELECT
         ccc.id AS linea_id,
         ccc.tk2_precio_id,
         ccc.tk2_precio_plan_id,
+
         a.slug AS articulo_slug,
         a.nombre_articulo,
         a.modelo,
         a.codigo_sistema,
         a.is_motocicleta,
+
         ccc.cantidad,
         ccc.precio_contado,
         ccc.precio_final,
@@ -154,51 +164,203 @@ export class CarritosConsultasService {
         ccc.descuento_porcentaje,
         ccc.total,
         ccc.tipo_linea,
-        ccc.comentario
+        ccc.comentario,
+
+        ccc.remision_articulo_id,
+
+        ra.serie_fabricante,
+
+        m.motor AS moto_motor,
+        m.chasis AS moto_chasis,
+        m.cilindraje AS moto_cilindraje,
+        m.anio AS moto_anio,
+        m.color AS moto_color,
+        m.placa AS moto_placa,
+        m.facturado AS moto_facturado
+
       FROM cuerpo_carrito_compras ccc
+
       INNER JOIN articulos a
         ON a.id = ccc.articulo_id
+
+      LEFT JOIN remision_articulos ra
+        ON ra.id = ccc.remision_articulo_id
+
+      LEFT JOIN motocicletas m
+        ON m.remision_articulo_id = ra.id
+
       WHERE ccc.carrito_compra_id = ?
         AND ccc.estado = 1
+
       ORDER BY ccc.id ASC
       `,
             [carrito.id],
         );
 
-        const articulos = lineas.map((linea: any) => ({
-            linea_id: Number(linea.linea_id),
-            articulo_slug: linea.articulo_slug,
-            nombre_articulo: linea.nombre_articulo,
-            modelo: linea.modelo,
-            codigo_sistema: linea.codigo_sistema,
-            es_motocicleta:
-                Number(linea.is_motocicleta) === 1,
-            tk2_precio_id:
-                linea.tk2_precio_id === null
-                    ? null
-                    : Number(linea.tk2_precio_id),
-            tk2_precio_plan_id:
-                linea.tk2_precio_plan_id === null
-                    ? null
-                    : Number(linea.tk2_precio_plan_id),
-            cantidad: Number(linea.cantidad),
-            precio_contado: Number(linea.precio_contado),
-            precio_final: Number(linea.precio_final),
-            subtotal: Number(linea.subtotal),
-            descuento: Number(linea.descuento_monto),
-            descuento_monto: Number(linea.descuento_monto),
-            descuento_porcentaje:
-                Number(linea.descuento_porcentaje),
-            total: Number(linea.total),
-            tipo_linea: linea.tipo_linea,
-            comentario: linea.comentario,
+        const articulos = lineas.map((linea: any) => {
+            const esMotocicleta =
+                Number(linea.is_motocicleta) === 1;
+
+            const tieneRemision =
+                linea.remision_articulo_id !== null &&
+                linea.remision_articulo_id !== undefined;
+
+            const tieneMotocicleta =
+                linea.moto_chasis !== null &&
+                linea.moto_chasis !== undefined;
+
+            return {
+                linea_id: Number(linea.linea_id),
+                articulo_slug: linea.articulo_slug,
+                nombre_articulo: linea.nombre_articulo,
+                modelo: linea.modelo,
+                codigo_sistema: linea.codigo_sistema,
+
+                es_motocicleta: esMotocicleta,
+
+                tk2_precio_id:
+                    linea.tk2_precio_id === null
+                        ? null
+                        : Number(linea.tk2_precio_id),
+
+                tk2_precio_plan_id:
+                    linea.tk2_precio_plan_id === null
+                        ? null
+                        : Number(linea.tk2_precio_plan_id),
+
+                cantidad: Number(linea.cantidad),
+                precio_contado: Number(linea.precio_contado),
+                precio_final: Number(linea.precio_final),
+                subtotal: Number(linea.subtotal),
+                descuento: Number(linea.descuento_monto),
+                descuento_monto: Number(linea.descuento_monto),
+                descuento_porcentaje:
+                    Number(linea.descuento_porcentaje),
+                total: Number(linea.total),
+                tipo_linea: linea.tipo_linea,
+                comentario: linea.comentario,
+
+                // Serie obligatoria para motocicletas.
+                // La vinculación física se verifica aparte.
+                tiene_serie: esMotocicleta || tieneRemision,
+
+                requiere_vinculacion:
+                    esMotocicleta &&
+                    (!tieneRemision || !tieneMotocicleta),
+
+                remision_articulo: tieneRemision
+                    ? {
+                        serie_fabricante:
+                            linea.serie_fabricante ?? null,
+
+                        motocicleta: tieneMotocicleta
+                            ? {
+                                motor: linea.moto_motor,
+                                chasis: linea.moto_chasis,
+                                cilindraje: linea.moto_cilindraje,
+                                anio: linea.moto_anio,
+                                color: linea.moto_color,
+                                placa: linea.moto_placa,
+                                facturado:
+                                    linea.moto_facturado === null
+                                        ? null
+                                        : Number(linea.moto_facturado),
+                            }
+                            : null,
+                    }
+                    : null,
+            };
+        });
+
+        // ==========================================
+        // 3. REGALÍAS DEL CARRITO
+        // ==========================================
+
+        const filasRegalias = await consultar(
+            `
+      SELECT
+        cr.cuerpo_carrito_compra_id
+          AS linea_principal_id,
+
+        cr.cuerpo_carrito_regalia_id
+          AS linea_regalia_id,
+
+        a.slug AS articulo_slug,
+        a.nombre_articulo,
+        a.modelo,
+        a.codigo_sistema,
+
+        ccc.cantidad,
+        ccc.precio_contado,
+        ccc.precio_final,
+        ccc.subtotal,
+        ccc.descuento_monto,
+        ccc.total,
+        ccc.tipo_linea,
+        ccc.estado
+
+      FROM carrito_compra_regalias cr
+
+      INNER JOIN cuerpo_carrito_compras ccc
+        ON ccc.id = cr.cuerpo_carrito_regalia_id
+       AND ccc.carrito_compra_id = cr.carrito_compra_id
+
+      INNER JOIN articulos a
+        ON a.id = ccc.articulo_id
+
+      WHERE cr.carrito_compra_id = ?
+
+      ORDER BY cr.id ASC
+      `,
+            [carrito.id],
+        );
+
+        const regalias = filasRegalias.map((fila: any) => ({
+            linea_principal_id:
+                Number(fila.linea_principal_id),
+
+            linea_regalia_id:
+                Number(fila.linea_regalia_id),
+
+            articulo_slug: fila.articulo_slug,
+            nombre_articulo: fila.nombre_articulo,
+            modelo: fila.modelo,
+            codigo_sistema: fila.codigo_sistema,
+
+            cantidad: Number(fila.cantidad),
+            precio_contado: Number(fila.precio_contado),
+            precio_final: Number(fila.precio_final),
+            subtotal: Number(fila.subtotal),
+            descuento_monto: Number(fila.descuento_monto),
+            total: Number(fila.total),
+            tipo_linea: fila.tipo_linea,
+            estado: Number(fila.estado),
         }));
 
-        const cantidadArticulos = articulos.reduce(
+        // ==========================================
+        // 4. VINCULAR REGALÍAS A SUS ARTÍCULOS
+        // ==========================================
+
+        const articulosConRegalias = articulos.map(
+            (articulo: any) => ({
+                ...articulo,
+                regalias: regalias.filter(
+                    (regalia: any) =>
+                        regalia.linea_principal_id ===
+                        articulo.linea_id,
+                ),
+            }),
+        );
+
+        const cantidadArticulos = articulosConRegalias.reduce(
             (total: number, articulo: any) =>
                 total + articulo.cantidad,
             0,
         );
+
+        // ==========================================
+        // 5. RESPUESTA
+        // ==========================================
 
         return {
             success: true,
@@ -207,6 +369,7 @@ export class CarritosConsultasService {
                 nombre: carrito.nombre,
                 estado: carrito.estado,
                 tipo: carrito.tipo,
+
                 cliente: {
                     slug: carrito.cliente_slug,
                     nombre_completo: [
@@ -216,12 +379,16 @@ export class CarritosConsultasService {
                         .filter(Boolean)
                         .join(' '),
                 },
+
                 subtotal: Number(carrito.subtotal),
                 descuento: Number(carrito.descuento),
                 total_neto: Number(carrito.total_neto),
-                cantidad_lineas: articulos.length,
+
+                cantidad_lineas: articulosConRegalias.length,
                 cantidad_articulos: cantidadArticulos,
-                articulos,
+
+                articulos: articulosConRegalias,
+                regalias,
             },
         };
     }

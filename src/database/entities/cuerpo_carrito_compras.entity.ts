@@ -11,6 +11,9 @@ export class CuerpoCarritoCompras {
   @Column({ name: "articulo_id", type: "bigint", unsigned: true, comment: "Artículo agregado al carrito" })
   articulo_id!: string;
 
+  @Column({name: 'remision_articulo_id', type: 'bigint', unsigned: true, nullable: true,})
+  remision_articulo_id!: string | null;
+
   @Column({ name: "tk2_precio_id", type: "bigint", unsigned: true, nullable: true, comment: "Precio base seleccionado al momento de agregar el artículo" })
   tk2_precio_id!: string | null;
 

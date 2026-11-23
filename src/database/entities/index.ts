@@ -260,3 +260,5 @@ export * from './caja-sesiones-dispositivos.entity.js';
 export * from './caja-operaciones-pago.entity.js';
 export * from './nota-credito-cliente-aplicaciones.entity.js';
 export * from './nota-credito-cliente-contadores.entitys.js';
+export * from './carrito-compra-regalias.entity.js';
+export * from './carrito-compra-bloqueos.entity.js'

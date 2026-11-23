@@ -23,6 +23,15 @@ import { PostearCuentaProcesarService } from './postear_cuenta/postear-cuenta-pr
 import { CajaConsultaService } from './caja-consulta.service.js';
 
 import { PermisosService } from '../../common/permisos/permisos.service.js';
+import { InventarioMotocicletasService} from "../inventario/inventario-motocicletas.service.js";
+import {
+    CarritosRemisionesService,
+    type VincularRemisionCarritoDto
+} from "../clientes/carritos_compras/carritos-remisiones.service.js";
+import { CajaVentaContadoService } from './venta-contado/caja-venta-contado.service.js';
+import { CarritosImpuestosService} from "../clientes/carritos_compras/carritos-impuestos.service.js";
+import { ClientesService } from '../clientes/clientes.service.js';
+import { NotasCreditoDisponiblesService } from '../clientes/notas_credito_clientes/notas-credito-disponibles.service.js';
 
 import type {
     AuthenticatedRequest,
@@ -39,6 +48,12 @@ export class CajaController {
         private readonly cajaOperacionPagoService: CajaOperacionPagoService,
         private readonly postearCuentaService: PostearCuentaProcesarService,
         private readonly cajaConsultaService: CajaConsultaService,
+        private readonly inventarioMotocicletas: InventarioMotocicletasService,
+        private readonly carritosRemisionesService: CarritosRemisionesService,
+        private readonly cajaVentaContado: CajaVentaContadoService,
+        private readonly carritosImpuestosService: CarritosImpuestosService,
+        private readonly clientesService: ClientesService,
+        private readonly notasCreditoDisponiblesService: NotasCreditoDisponiblesService,
     ) {}
 
     // ==========================================
@@ -562,4 +577,107 @@ export class CajaController {
             user_id: userId,
         });
     }
+
+
+
+
+    @Get('inventario/motocicletas/:articuloSlug')
+    async consultarMotocicletasCaja(
+        @Param('articuloSlug') articuloSlug: string,
+        @Headers('x-caja-token') token: string,
+        @Req() request: AuthenticatedRequest,
+    ) {
+        const userId = request.user?.id;
+
+        if (!userId) {
+            throw new UnauthorizedException('Usuario no autenticado.');
+        }
+
+        const contexto = await this.cajaVentaContado.obtenerContexto(
+            token,
+            String(userId),
+        );
+
+        return this.inventarioMotocicletas.consultar({
+            articuloSlug,
+            sucursalId: contexto.sucursalId,
+        });
+    }
+
+
+
+
+
+
+    @Post('carritos/:carritoSlug/articulos/vincular-remision')
+    async vincularRemisionCarrito(
+        @Param('carritoSlug') carritoSlug: string,
+        @Body() body: VincularRemisionCarritoDto,
+        @Headers('x-caja-token') token: string,
+        @Req() request: AuthenticatedRequest,
+    ) {
+        const userId = request.user?.id;
+
+        if (!userId) {
+            throw new UnauthorizedException('Usuario no autenticado.');
+        }
+
+        const contexto = await this.cajaVentaContado.obtenerContexto(
+            token,
+            String(userId),
+        );
+
+        return this.carritosRemisionesService.vincular(
+            carritoSlug,
+            body,
+            contexto.sucursalId,
+        );
+    }
+
+
+
+    @Get('carritos/:carritoSlug/impuestos')
+    async consultarImpuestosCarrito(
+        @Param('carritoSlug') carritoSlug: string,
+        @Headers('x-caja-token') token: string,
+        @Req() request: AuthenticatedRequest,
+    ) {
+        const userId = request.user?.id;
+
+        if (!userId) {
+            throw new UnauthorizedException('Usuario no autenticado.');
+        }
+
+        const contexto = await this.cajaVentaContado.obtenerContexto(
+            token,
+            String(userId),
+        );
+
+        return this.carritosImpuestosService.consultar(
+            carritoSlug,
+            contexto.sucursalId,
+        );
+    }
+
+
+
+    @Get('clientes/:clienteSlug/notas-credito-disponibles')
+    async consultarNotasCreditoDisponibles(
+        @Param('clienteSlug') clienteSlug: string,
+        @Headers('x-caja-token') token: string,
+        @Req() request: AuthenticatedRequest,
+    ) {
+        const userId = request.user?.id;
+        if (!userId) throw new UnauthorizedException('Usuario no autenticado.');
+
+        if (!clienteSlug?.trim()) throw new BadRequestException('Debes proporcionar el slug del cliente.');
+
+        await this.cajaVentaContado.obtenerContexto(token, String(userId));
+
+        const clienteId = await this.clientesService.obtenerIdInterno(clienteSlug.trim());
+
+        return this.notasCreditoDisponiblesService.consultar(clienteId);
+    }
+
+
 }

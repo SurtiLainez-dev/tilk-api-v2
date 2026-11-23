@@ -1,3 +1,4 @@
+
 import {
     Body,
     Controller,
@@ -5,6 +6,7 @@ import {
     Get,
     Headers,
     Param,
+    Patch,
     Post,
     Req,
     UnauthorizedException,
@@ -16,6 +18,11 @@ import { CarritosConsultasService } from './carritos-consultas.service.js';
 import { CajaVentaContadoService } from '../../caja/venta-contado/caja-venta-contado.service.js';
 import { CarritosArticulosService } from './carritos-articulos.service.js';
 import { CarritosGuardarService } from './carritos-guardar.service.js';
+import {
+    CarritosRegaliasService,
+    type GuardarRegaliaDto,
+    type ActualizarRegaliaDto,
+} from './carritos-regalias.service.js';
 import { AgregarArticuloCarritoDto } from './dto/gregar-articulo-carrito.dto.js';
 import { GuardarCarritoContadoDto } from './dto/guardar-carrito-contado.dto.js';
 
@@ -32,6 +39,7 @@ export class CarritosController {
         private readonly cajaVentaContado: CajaVentaContadoService,
         private readonly articulos: CarritosArticulosService,
         private readonly guardarService: CarritosGuardarService,
+        private readonly regaliasService: CarritosRegaliasService,
     ) {}
 
     private async obtenerContexto(
@@ -64,6 +72,10 @@ export class CarritosController {
         };
     }
 
+    // ==========================================
+    // CONSULTAR CARRITOS ABIERTOS
+    // ==========================================
+
     @Get('cliente/:clienteSlug/abiertos')
     async buscarAbiertos(
         @Param('clienteSlug') clienteSlug: string,
@@ -80,6 +92,10 @@ export class CarritosController {
             sucursalId,
         );
     }
+
+    // ==========================================
+    // GUARDAR CARRITO DE CONTADO
+    // ==========================================
 
     @Post('guardar-contado')
     @UsePipes(
@@ -104,6 +120,10 @@ export class CarritosController {
         );
     }
 
+    // ==========================================
+    // CONSULTAR DETALLE DEL CARRITO
+    // ==========================================
+
     @Get(':slug')
     async obtenerDetalle(
         @Param('slug') slug: string,
@@ -120,6 +140,10 @@ export class CarritosController {
             sucursalId,
         );
     }
+
+    // ==========================================
+    // AGREGAR ARTÍCULO AL CARRITO
+    // ==========================================
 
     @Post(':slug/articulos')
     @UsePipes(
@@ -147,6 +171,10 @@ export class CarritosController {
         );
     }
 
+    // ==========================================
+    // ELIMINAR ARTÍCULO DEL CARRITO
+    // ==========================================
+
     @Delete(':slug/articulos/:articuloSlug/precio/:precioId')
     async eliminarArticulo(
         @Param('slug') slug: string,
@@ -165,6 +193,73 @@ export class CarritosController {
             articuloSlug,
             precioId,
             sucursalId,
+        );
+    }
+
+    // ==========================================
+    // CONSULTAR REGALÍAS DEL CARRITO
+    // ==========================================
+
+    @Get(':slug/regalias')
+    async consultarRegalias(
+        @Param('slug') slug: string,
+        @Headers('x-caja-token') token: string,
+        @Req() request: SolicitudAutenticada,
+    ) {
+        const { sucursalId } = await this.obtenerContexto(
+            request,
+            token,
+        );
+
+        return this.regaliasService.consultar(
+            slug,
+            sucursalId,
+        );
+    }
+
+    // ==========================================
+    // AGREGAR REGALÍA AL CARRITO
+    // ==========================================
+
+    @Post(':slug/regalias')
+    async agregarRegalia(
+        @Param('slug') slug: string,
+        @Body() dto: GuardarRegaliaDto,
+        @Headers('x-caja-token') token: string,
+        @Req() request: SolicitudAutenticada,
+    ) {
+        const { sucursalId, userId } =
+            await this.obtenerContexto(request, token);
+
+        return this.regaliasService.agregar(
+            slug,
+            dto,
+            sucursalId,
+            userId,
+        );
+    }
+
+    // ==========================================
+    // ACTUALIZAR CANTIDAD DE REGALÍA
+    // ==========================================
+
+    @Patch(':slug/regalias/:lineaRegaliaId')
+    async actualizarRegalia(
+        @Param('slug') slug: string,
+        @Param('lineaRegaliaId') lineaRegaliaId: string,
+        @Body() dto: ActualizarRegaliaDto,
+        @Headers('x-caja-token') token: string,
+        @Req() request: SolicitudAutenticada,
+    ) {
+        const { sucursalId, userId } =
+            await this.obtenerContexto(request, token);
+
+        return this.regaliasService.actualizar(
+            slug,
+            Number(lineaRegaliaId),
+            dto,
+            sucursalId,
+            userId,
         );
     }
 }

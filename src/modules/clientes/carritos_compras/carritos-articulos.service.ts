@@ -118,15 +118,6 @@ export class CarritosArticulosService {
             );
         }
 
-        if (
-            validarMotocicleta &&
-            this.numero(articulo.is_motocicleta) === 1
-        ) {
-            throw new BadRequestException(
-                'Las motocicletas no pueden agregarse desde esta operación de contado.',
-            );
-        }
-
         return articulo;
     }
 

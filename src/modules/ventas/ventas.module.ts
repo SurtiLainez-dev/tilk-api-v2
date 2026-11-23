@@ -3,26 +3,16 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import {
-
     VentasEntity,
     Sucursals,
     Colaboradors,
     CobSegmentos,
-    CobPortafolios,
+    CobPortafolios,} from '../../database/entities/index.js';
 
-} from '../../database/entities/index.js';
-
-import {
-
-    VentasController,
-
-} from './ventas.controller.js';
-
-import {
-
-    VentasService,
-
-} from './ventas.service.js';
+import {VentasController,} from './ventas.controller.js';
+import {VentasService,} from './ventas.service.js';
+import { VentasCodigoService } from './ventas-codigo.service.js';
+import { CobPortafoliosModule } from '../cobros/portafolios/cob-portafolios.module.js';
 
 @Module({
 
@@ -35,9 +25,8 @@ import {
             Colaboradors,
             CobSegmentos,
             CobPortafolios,
-
         ]),
-
+        CobPortafoliosModule,
     ],
 
     controllers: [
@@ -49,7 +38,7 @@ import {
     providers: [
 
         VentasService,
-
+        VentasCodigoService
     ],
 
     exports: [

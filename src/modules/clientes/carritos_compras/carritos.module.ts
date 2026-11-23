@@ -7,6 +7,9 @@ import { CarritosService } from './carritos.service.js';
 import { CarritosConsultasService } from './carritos-consultas.service.js';
 import { CarritosArticulosService } from './carritos-articulos.service.js';
 import { CarritosGuardarService } from './carritos-guardar.service.js';
+import { CarritosRegaliasService } from './carritos-regalias.service.js';
+import { CarritosFacturacionController } from './carritos-facturacion.controller.js';
+import { CarritosFacturacionService } from './carritos-facturacion.service.js';
 
 @Module({
     imports: [
@@ -15,6 +18,7 @@ import { CarritosGuardarService } from './carritos-guardar.service.js';
 
     controllers: [
         CarritosController,
+        CarritosFacturacionController
     ],
 
     providers: [
@@ -22,6 +26,8 @@ import { CarritosGuardarService } from './carritos-guardar.service.js';
         CarritosConsultasService,
         CarritosArticulosService,
         CarritosGuardarService,
+        CarritosRegaliasService,
+        CarritosFacturacionService
     ],
 
     exports: [
