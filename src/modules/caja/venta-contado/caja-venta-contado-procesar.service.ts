@@ -731,7 +731,7 @@ export class CajaVentaContadoProcesarService {
                     const numeracion = await this.directriz.prepararCodigo(
                         manager,
                         contexto.sucursalId,
-                        4,
+                        2,
                     );
 
                     this.logger.log(`[DIRECTRIZ_OK] ${numeracion.codigo}`);

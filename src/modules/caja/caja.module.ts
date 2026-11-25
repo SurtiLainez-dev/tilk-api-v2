@@ -75,6 +75,8 @@ import { FacturaPdfService } from '../documentos/caja/factura-pdf.service.js';
 import { CajaCierresService } from './caja-cierres.service.js';
 import { CajaCierresConsultaService } from './caja-cierres-consulta.service.js';
 import { CajaCierresDocumentoService } from './caja-cierres-documento.service.js';
+import { CajaHistorialCierresController } from './caja-historial-cierres.controller.js';
+import { CajaHistorialCierresService } from './caja-historial-cierres.service.js';
 
 @Module({
     imports: [
@@ -110,6 +112,7 @@ import { CajaCierresDocumentoService } from './caja-cierres-documento.service.js
         // Venta de contado
         CajaVentaContadoController,
         CajaAnticiposController,
+        CajaHistorialCierresController
     ],
 
     providers: [
@@ -175,6 +178,7 @@ import { CajaCierresDocumentoService } from './caja-cierres-documento.service.js
 
         CajaCierresService,
         CajaCierresConsultaService,
+        CajaHistorialCierresService,
     ],
 
     exports: [
