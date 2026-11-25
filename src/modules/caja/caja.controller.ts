@@ -158,7 +158,7 @@ export class CajaController {
     // Requiere acceso al módulo Contabilidad
     // ==========================================
 
-    @Put(':cajaId/regenerar-pin')
+    @Post(':cajaId/regenerar-pin')
     async regenerarPinCaja(
         @Req() request: AuthenticatedRequest,
         @Param('cajaId') cajaId: string,
