@@ -1,10 +1,4 @@
-
-import {
-    BadRequestException,
-    ConflictException,
-    Injectable,
-    NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
 export interface CambioRegaliaLote {
@@ -240,22 +234,34 @@ export class CarritosRegaliasLoteService {
             let agregadas = 0;
             let actualizadas = 0;
 
+            const ahora = new Date();
+
             for (const operacion of operaciones) {
                 if (operacion.tipo === 'ACTUALIZAR') {
                     await runner.query(`
                         UPDATE cuerpo_carrito_compras
-                        SET cantidad = ?, updated_at = NOW()
+                        SET cantidad = ?, updated_at = ?
                         WHERE id = ?
                           AND carrito_compra_id = ?
                           AND es_regalia = 1
-                    `, [operacion.cantidad, operacion.lineaRegaliaId, carritoId]);
+                    `, [
+                        operacion.cantidad,
+                        ahora,
+                        operacion.lineaRegaliaId,
+                        carritoId,
+                    ]);
 
                     await runner.query(`
                         UPDATE carrito_compra_regalias
-                        SET user_id = ?, updated_at = NOW()
+                        SET user_id = ?, updated_at = ?
                         WHERE carrito_compra_id = ?
                           AND cuerpo_carrito_regalia_id = ?
-                    `, [userId, carritoId, operacion.lineaRegaliaId]);
+                    `, [
+                        userId,
+                        ahora,
+                        carritoId,
+                        operacion.lineaRegaliaId,
+                    ]);
 
                     actualizadas++;
                     continue;
@@ -285,9 +291,16 @@ export class CarritosRegaliasLoteService {
                         0, 0, 0, 0, 0, 0, 0,
                         1, 'PENDIENTE_APROBACION',
                         'REGALIA', 1, ?,
-                        NOW(), NOW()
+                        ?, ?
                     )
-                `, [carritoId, operacion.articuloId, operacion.cantidad, userId]);
+                `, [
+                    carritoId,
+                    operacion.articuloId,
+                    operacion.cantidad,
+                    userId,
+                    ahora,
+                    ahora,
+                ]);
 
                 const lineaRegaliaId = String(insertado.insertId);
 
@@ -299,12 +312,14 @@ export class CarritosRegaliasLoteService {
                         user_id,
                         created_at,
                         updated_at
-                    ) VALUES (?, ?, ?, ?, NOW(), NOW())
+                    ) VALUES (?, ?, ?, ?, ?, ?)
                 `, [
                     carritoId,
                     operacion.lineaPrincipalId,
                     lineaRegaliaId,
                     userId,
+                    ahora,
+                    ahora,
                 ]);
 
                 agregadas++;

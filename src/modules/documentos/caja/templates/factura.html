@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Factura {{CODIGO}}</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            margin: 0;
+            padding: 0;
+            background: #fff;
+        }
+
+        body {
+            width: 80mm;
+            margin: 0;
+            padding: 3mm;
+            background: #fff;
+            color: #111;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 11px;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        /* ENCABEZADO DE LA EMPRESA */
+
+        .encabezado {
+            text-align: center;
+        }
+
+        .empresa {
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .empresa-datos {
+            font-size: 10px;
+            line-height: 1.4;
+        }
+
+        .empresa-rtn {
+            font-size: 11px;
+            font-weight: bold;
+            margin-top: 4px;
+        }
+
+        /* SUCURSAL */
+
+        .sucursal {
+            margin-top: 14px;
+        }
+
+        .sucursal-codigo {
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .sucursal-nombre {
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        .sucursal-datos {
+            font-size: 10px;
+            line-height: 1.4;
+            margin-top: 3px;
+        }
+
+        /* FACTURA */
+
+        .titulo-factura {
+            font-size: 19px;
+            font-weight: 800;
+            margin-top: 14px;
+        }
+
+        .codigo-factura {
+            font-size: 15px;
+            font-weight: 800;
+            margin-top: 4px;
+            white-space: nowrap;
+        }
+
+        .separador {
+            border-top: 1px dashed #555;
+            margin: 10px 0;
+        }
+
+        .datos {
+            font-size: 10px;
+            line-height: 1.45;
+        }
+
+        .dato {
+            margin: 3px 0;
+            overflow-wrap: anywhere;
+        }
+
+        .etiqueta {
+            font-weight: bold;
+        }
+
+        /* CLIENTE */
+
+        .cliente {
+            font-size: 11px;
+            line-height: 1.45;
+        }
+
+        /* DETALLE DE ARTÍCULOS */
+
+        .seccion-titulo {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .tabla-articulos {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 9px;
+        }
+
+        .tabla-articulos thead th {
+            font-size: 9px;
+            font-weight: bold;
+            padding: 5px 1px;
+            border-bottom: 1px solid #333;
+            vertical-align: bottom;
+        }
+
+        .tabla-articulos tbody td {
+            vertical-align: top;
+            padding: 7px 1px;
+        }
+
+        .articulo-fila {
+            border-bottom: 1px dashed #bbb;
+            break-inside: avoid;
+        }
+
+        .articulo-fila:last-child {
+            border-bottom: none;
+        }
+
+        .col-cantidad {
+            width: 8%;
+            text-align: center;
+        }
+
+        .col-detalle {
+            width: 46%;
+            text-align: left;
+            overflow-wrap: anywhere;
+        }
+
+        .col-precio {
+            width: 23%;
+            text-align: right;
+            white-space: nowrap;
+            font-size: 9px;
+        }
+
+        .col-total {
+            width: 23%;
+            text-align: right;
+            white-space: nowrap;
+            font-size: 9px;
+        }
+
+        .articulo-nombre {
+            font-size: 10px;
+            font-weight: bold;
+            line-height: 1.3;
+            text-transform: uppercase;
+        }
+
+        .articulo-modelo,
+        .articulo-serie,
+        .articulo-impuesto,
+        .articulo-descuento {
+            font-size: 9px;
+            margin-top: 2px;
+            line-height: 1.3;
+        }
+
+        .articulo-regalia {
+            font-size: 9px;
+            font-weight: bold;
+            margin-top: 3px;
+        }
+
+        .cantidad-articulos {
+            font-size: 10px;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+
+        /* DESGLOSE DE IMPORTES */
+
+        .fila {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 7px;
+            margin: 4px 0;
+        }
+
+        .fila span:first-child {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .fila span:last-child {
+            flex-shrink: 0;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .desglose {
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .total {
+            font-size: 16px;
+            font-weight: 800;
+            margin: 9px 0;
+            padding-top: 7px;
+            border-top: 1px solid #333;
+        }
+
+        .pago {
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        /* CANTIDAD EN LETRAS */
+
+        .letras {
+            text-align: center;
+            margin: 12px 0;
+        }
+
+        .letras-titulo {
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .letras-contenido {
+            font-size: 11px;
+            margin-top: 5px;
+            text-transform: uppercase;
+            overflow-wrap: anywhere;
+        }
+
+        /* INFORMACIÓN FISCAL */
+
+        .fiscal {
+            text-align: center;
+            margin: 12px 0;
+        }
+
+        .fiscal-titulo {
+            font-size: 11px;
+            font-weight: bold;
+            margin-top: 10px;
+            margin-bottom: 3px;
+        }
+
+        .fiscal-contenido {
+            font-size: 10px;
+            line-height: 1.45;
+        }
+
+        .fiscal-cai {
+            font-size: 10px;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+            word-break: break-all;
+        }
+
+        /* OBSERVACIONES */
+
+        .observacion {
+            font-size: 10px;
+            margin: 10px 0;
+            line-height: 1.4;
+        }
+
+        /* SERVICIO AL CLIENTE */
+
+        .servicio-cliente {
+            font-size: 10px;
+            line-height: 1.5;
+            text-align: center;
+            margin: 12px 0;
+        }
+
+        .servicio-cliente-titulo {
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
+
+        .servicio-cliente-contacto {
+            font-weight: bold;
+            margin-top: 5px;
+            overflow-wrap: anywhere;
+        }
+
+        /* FIRMA DEL CAJERO */
+
+        .firma {
+            text-align: center;
+            margin-top: 24mm;
+            margin-bottom: 12px;
+        }
+
+        .firma-linea {
+            width: 85%;
+            border-top: 1px solid #111;
+            margin: 0 auto;
+        }
+
+        .firma-texto {
+            font-size: 11px;
+            margin-top: 5px;
+        }
+
+        /* PIE DE FACTURA */
+
+        .pie {
+            text-align: center;
+            font-size: 10px;
+            line-height: 1.5;
+            margin-top: 12px;
+        }
+
+        .original-copia {
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 7px;
+        }
+
+        .mensaje-fiscal {
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .agradecimiento {
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .bendicion {
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 6px;
+        }
+
+        .generacion {
+            font-size: 9px;
+            margin-top: 10px;
+            color: #444;
+        }
+
+        @media print {
+            body {
+                width: 80mm;
+            }
+
+            .articulo-fila {
+                break-inside: avoid;
+            }
+
+            .firma {
+                break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- ENCABEZADO DE LA EMPRESA -->
+
+<div class="encabezado">
+
+    <div class="empresa">
+        {{EMPRESA}}
+    </div>
+
+    <div class="empresa-datos">
+        <div>{{EMPRESA_DIRECCION}}</div>
+        <div>PROPIETARIA:</div>
+        <div>{{EMPRESA_PROPIETARIO}}</div>
+        <div>CORREO: {{EMPRESA_EMAIL}}</div>
+    </div>
+
+    <div class="empresa-rtn">
+        RTN: {{EMPRESA_RTN}}
+    </div>
+
+    <!-- SUCURSAL -->
+
+    <div class="sucursal">
+
+        <div class="sucursal-codigo">
+            [{{SUCURSAL_CODIGO}}]
+        </div>
+
+        <div class="sucursal-nombre">
+            {{SUCURSAL}}
+        </div>
+
+        <div class="sucursal-datos">
+            <div>{{SUCURSAL_DIRECCION}}</div>
+            <div>TELÉFONO: {{SUCURSAL_TELEFONO}}</div>
+            <div>CORREO: {{SUCURSAL_EMAIL}}</div>
+        </div>
+
+    </div>
+
+    <!-- TÍTULO Y NUMERACIÓN -->
+
+    <div class="titulo-factura">
+        FACTURA
+    </div>
+
+    <div class="codigo-factura">
+        {{CODIGO}}
+    </div>
+
+</div>
+
+<div class="separador"></div>
+
+<!-- INFORMACIÓN DE LA FACTURA -->
+
+<div class="datos">
+
+    <div class="dato">
+        <span class="etiqueta">TIPO DE COMPRA:</span>
+        {{TIPO_COMPRA}}
+    </div>
+
+    <div class="dato">
+        <span class="etiqueta">FECHA Y HORA:</span>
+        {{FECHA}} {{HORA}}
+    </div>
+
+    <div class="dato">
+        <span class="etiqueta">CÓDIGO DE CAJA:</span>
+        {{CAJA}}
+    </div>
+
+    <div class="dato">
+        <span class="etiqueta">USUARIO:</span>
+        {{USUARIO}}
+    </div>
+
+    <div class="dato">
+        <span class="etiqueta">CÓDIGO DE LA VENTA:</span>
+        {{CODIGO_VENTA}}
+    </div>
+
+    <div class="dato">
+        <span class="etiqueta">VENDEDOR:</span>
+        {{VENDEDOR}}
+    </div>
+
+</div>
+
+<div class="separador"></div>
+
+<!-- INFORMACIÓN DEL CLIENTE -->
+
+<div class="cliente">
+
+    <div class="dato">
+        <span class="etiqueta">CLIENTE:</span>
+        {{CLIENTE}}
+    </div>
+
+    {{CLIENTE_RTN_HTML}}
+
+</div>
+
+<div class="separador"></div>
+
+<!-- DETALLE DE VENTA -->
+
+<div class="seccion-titulo">
+    DETALLE DE VENTA
+</div>
+
+<table class="tabla-articulos">
+
+    <thead>
+    <tr>
+        <th class="col-cantidad">#</th>
+        <th class="col-detalle">Artículo</th>
+        <th class="col-precio">Precio</th>
+        <th class="col-total">Total</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    {{ARTICULOS}}
+    </tbody>
+
+</table>
+
+<div class="cantidad-articulos">
+    Cantidad de artículos: {{CANTIDAD_ARTICULOS}}
+</div>
+
+<div class="separador"></div>
+
+<!-- IMPORTES REGISTRADOS EN FACTURA_VENTAS -->
+<div class="fila desglose">
+    <span>Importe Exonerado:</span>
+    <span>L 0.00</span>
+</div>
+<div class="fila desglose">
+    <span>Importe Exento:</span>
+    <span>L 0.00</span>
+</div>
+<div class="fila desglose">
+    <span>Importe Gravado 15%:</span>
+    <span>L {{SUB_TOTAL}}</span>
+</div>
+<div class="fila desglose">
+    <span>Importe Gravado 18%:</span>
+    <span>L 0.00</span>
+</div>
+
+<div class="fila desglose">
+    <span>Descuentos y Rebajas:</span>
+    <span>L {{DESCUENTOS}}</span>
+</div>
+
+<div class="fila desglose">
+    <span>I.S.V. 15%:</span>
+    <span>L {{IMPUESTO}}</span>
+</div>
+<div class="fila desglose">
+    <span>I.S.V. 18%:</span>
+    <span>L 0.00</span>
+</div>
+
+<!-- TOTAL DE LA FACTURA -->
+
+<div class="fila total">
+    <span>TOTAL:</span>
+    <span>L {{TOTAL}}</span>
+</div>
+
+<div class="fila pago">
+    <span>Efectivo:</span>
+    <span>L {{EFECTIVO}}</span>
+</div>
+
+<div class="fila pago">
+    <span>Cambio:</span>
+    <span>L {{CAMBIO}}</span>
+</div>
+
+<div class="datos">
+    {{FORMA_PAGO_HTML}}
+</div>
+
+<div class="separador"></div>
+
+<!-- CANTIDAD EN LETRAS -->
+
+<div class="letras">
+
+    <div class="letras-titulo">
+        CANTIDAD EN LETRAS
+    </div>
+
+    <div class="letras-contenido">
+        {{MONTO_LETRAS}}
+    </div>
+
+</div>
+
+<div class="separador"></div>
+
+<!-- INFORMACIÓN FISCAL -->
+
+<div class="fiscal">
+
+    <div class="fiscal-titulo">
+        RANGO AUTORIZADO
+    </div>
+
+    <div class="fiscal-contenido">
+        DEL {{RANGO_INICIAL}}
+    </div>
+
+    <div class="fiscal-contenido">
+        AL {{RANGO_FINAL}}
+    </div>
+
+    <div class="fiscal-titulo">
+        FECHA LÍMITE DE EMISIÓN
+    </div>
+
+    <div class="fiscal-contenido">
+        {{FECHA_LIMITE_EMISION}}
+    </div>
+
+    <div class="fiscal-titulo">
+        CAI
+    </div>
+
+    <div class="fiscal-cai">
+        {{CAI}}
+    </div>
+
+</div>
+
+<div class="separador"></div>
+
+<!-- OBSERVACIONES -->
+
+{{OBSERVACION_HTML}}
+
+<!-- SERVICIO AL CLIENTE -->
+
+<div class="servicio-cliente">
+
+    <div class="servicio-cliente-titulo">
+        SERVICIO AL CLIENTE
+    </div>
+
+    <div>
+        Para quejas, sugerencias, garantías
+        o conocer información sobre su cuenta,
+        puede comunicarse con nosotros a través
+        de los siguientes medios:
+    </div>
+
+    <div class="servicio-cliente-contacto">
+        TELÉFONO: {{SAC_TELEFONO}}
+    </div>
+
+    <div class="servicio-cliente-contacto">
+        CORREO: sac@grupolainez.com
+    </div>
+
+</div>
+
+<!-- FIRMA Y SELLO -->
+
+<div class="firma">
+
+    <div class="firma-linea"></div>
+
+    <div class="firma-texto">
+        FIRMA Y SELLO DEL CAJERO
+    </div>
+
+</div>
+
+<!-- PIE DE FACTURA -->
+
+<div class="pie">
+
+    <div class="original-copia">
+        ORIGINAL CLIENTE / COPIA EMISOR
+    </div>
+
+    <div class="mensaje-fiscal">
+        LA FACTURA ES BENEFICIO DE TODOS.
+    </div>
+
+    <div class="mensaje-fiscal">
+        ¡EXÍJALA!
+    </div>
+
+    <div class="agradecimiento">
+        ¡GRACIAS POR SU COMPRA!
+    </div>
+
+    <div class="bendicion">
+        ¡QUE DIOS LO BENDIGA!
+    </div>
+
+    <div class="generacion">
+        Documento generado:<br>
+        {{FECHA_GENERACION}}
+    </div>
+
+</div>
+
+</body>
+</html>

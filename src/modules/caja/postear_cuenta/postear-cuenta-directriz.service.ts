@@ -1,4 +1,3 @@
-
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 
@@ -135,9 +134,9 @@ export class PostearCuentaDirectrizService {
 
             const resultado = await manager.query(`
                 UPDATE directrices__impresions
-                SET contador_actual = ?, updated_at = NOW()
+                SET contador_actual = ?, updated_at = ?
                 WHERE id = ? AND contador_actual = ? AND estado = 1
-            `, [String(siguiente), codigo.directriz_id, codigo.contador_anterior]);
+            `, [String(siguiente), new Date(), codigo.directriz_id, codigo.contador_anterior]);
 
             if (resultado.affectedRows !== 1) throw new ConflictException('No se pudo actualizar el contador. La directriz pudo haber cambiado.');
 

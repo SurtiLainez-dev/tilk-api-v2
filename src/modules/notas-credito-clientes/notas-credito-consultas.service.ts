@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 
 import { NotaCreditoClientes } from '../../database/entities/index.js';
 import { SpacesService } from '../spaces/spaces.service.js';
+import { fechaHonduras } from '../../common/helpers/fecha.helper.js';
 
 @Injectable()
 export class NotasCreditoConsultasService {
@@ -428,12 +429,7 @@ export class NotasCreditoConsultasService {
             ? fecha.substring(0, 10)
             : `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
 
-        const hoy = new Intl.DateTimeFormat('en-CA', {
-            timeZone: 'America/Tegucigalpa',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-        }).format(new Date());
+        const { fecha: hoy } = fechaHonduras();
 
         return valor < hoy;
     }

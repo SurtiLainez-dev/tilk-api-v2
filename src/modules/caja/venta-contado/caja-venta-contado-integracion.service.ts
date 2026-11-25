@@ -1,18 +1,15 @@
-import {
-    BadRequestException,
-    Injectable,
-    InternalServerErrorException,
-    NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException, Logger } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 
 import { VentasService } from '../../ventas/ventas.service.js';
 import { PagosContratosService } from '../../ventas/pagos_contratos/pagos-contratos.service.js';
 import { FacturasContadosService } from '../../ventas/facturas_contados/facturas-contados.service.js';
+import { OrdenEntregaVentasService } from '../../ventas/inventario/orden-entrega-ventas.service.js';
 import { RemisionVentaCreada } from '../../inventario/inventario-ventas.service.js';
 import { CodigoDirectriz } from '../postear_cuenta/postear-cuenta-directriz.service.js';
 import { PostearCuentaHistorialCajaService } from '../postear_cuenta/postear-cuenta-historial-caja.service.js';
 import { PostearCuentaMontoLetrasService } from '../postear_cuenta/postear-cuenta-monto-letras.service.js';
+import { fechaHonduras } from '../../../common/helpers/fecha.helper.js';
 
 import {
     ContextoProcesarVentaContado,
@@ -24,12 +21,15 @@ import { VentaContadoValidada } from './caja-venta-contado-validacion.service.js
 
 @Injectable()
 export class CajaVentaContadoIntegracionService {
+    private readonly logger = new Logger(CajaVentaContadoIntegracionService.name);
+
     constructor(
         private readonly ventasService: VentasService,
         private readonly pagosContratosService: PagosContratosService,
         private readonly facturasContadosService: FacturasContadosService,
         private readonly historialCaja: PostearCuentaHistorialCajaService,
         private readonly montoLetras: PostearCuentaMontoLetrasService,
+        private readonly ordenEntregaVentas: OrdenEntregaVentasService,
     ) {}
 
     private async obtenerClienteId(manager: EntityManager, slug: string): Promise<string> {
@@ -52,9 +52,7 @@ export class CajaVentaContadoIntegracionService {
         );
 
         if (!usuarios.length || !usuarios[0].colaborador_id) {
-            throw new BadRequestException(
-                'El usuario autenticado no tiene un colaborador asignado.',
-            );
+            throw new BadRequestException('El usuario autenticado no tiene un colaborador asignado.');
         }
 
         return String(usuarios[0].colaborador_id);
@@ -65,6 +63,8 @@ export class CajaVentaContadoIntegracionService {
         venta: VentaContadoValidada,
         contexto: ContextoProcesarVentaContado,
     ): Promise<VentaContadoRegistrada> {
+        this.logger.log(`[VENTA] Creando venta. Sucursal=${contexto.sucursalId}, Caja=${contexto.cajaId}, Total=${venta.total}`);
+
         const clienteId = await this.obtenerClienteId(manager, venta.cliente_slug);
         const colaboradorId = await this.obtenerColaboradorId(manager, contexto.userId);
 
@@ -98,6 +98,7 @@ export class CajaVentaContadoIntegracionService {
         ventaRegistrada: VentaContadoRegistrada,
     ): Promise<void> {
         const total = Number(venta.total);
+        this.logger.log(`[CONTRATO] Venta=${ventaRegistrada.ventaId}, Total=${total}`);
 
         await this.pagosContratosService.crearPagoContrato({
             venta_id: ventaRegistrada.ventaId,
@@ -128,68 +129,76 @@ export class CajaVentaContadoIntegracionService {
         const total = Number(venta.total);
         const subTotal = Number(venta.sub_total);
         const impuesto = Number(venta.impuesto);
+
+        this.logger.log(`[FACTURA] Venta=${ventaRegistrada.ventaId}, Numero=${numeracion.codigo}`);
+
         const esEfectivo = venta.forma_pago_id === '3';
         const recibido = esEfectivo ? Number(venta.monto_recibido ?? venta.total) : total;
 
         if (!Number.isFinite(recibido) || recibido < total) {
-            throw new BadRequestException(
-                'El monto recibido no puede ser menor que el total de la venta.',
-            );
+            throw new BadRequestException('El monto recibido no puede ser menor que el total de la venta.');
         }
 
         const cambio = esEfectivo
             ? Math.round((recibido - total) * 100) / 100
             : 0;
 
+        // Fecha y hora de Honduras mediante el helper global.
+        const { fecha: fechaHN, hora: horaHN, created_at, updated_at } = fechaHonduras();
+
+        this.logger.log(`[FACTURA_HORA] FechaHN=${fechaHN}, HoraHN=${horaHN}`);
+
         const resultado: { insertId?: number | string } = await manager.query(
             `
-INSERT INTO factura_ventas (
-    directrices__impresion_id,
-    venta_id,
-    sucursal_id,
-    caja_id,
-    user_id,
-    fecha,
-    hora,
-    cuerpo,
-    contador,
-    sub_total,
-    impuesto,
-    total,
-    efectivo,
-    cambio,
-    total_string,
-    estado,
-    descuento,
-    created_at,
-    updated_at
-) VALUES (
-        ?, ?, ?, ?, ?,
-    CURDATE(), CURTIME(),
-    NULL, ?, ?, ?, ?, ?, ?, ?,
-    1, 0, NOW(), NOW()
-)
-    `,
+                INSERT INTO factura_ventas (
+                    directrices__impresion_id,
+                    venta_id,
+                    sucursal_id,
+                    caja_id,
+                    user_id,
+                    fecha,
+                    hora,
+                    cuerpo,
+                    contador,
+                    sub_total,
+                    impuesto,
+                    total,
+                    efectivo,
+                    cambio,
+                    total_string,
+                    estado,
+                    descuento,
+                    created_at,
+                    updated_at
+                ) VALUES (
+                             ?, ?, ?, ?, ?,
+                             ?, ?,
+                             NULL, ?, ?, ?, ?, ?, ?, ?,
+                             1, 0, ?, ?
+                         )
+            `,
             [
                 numeracion.directriz_id,
                 ventaRegistrada.ventaId,
                 contexto.sucursalId,
                 contexto.cajaId,
                 contexto.userId,
-                numeracion.contador_generado,
+                fechaHN,
+                horaHN,
+                numeracion.codigo,
                 subTotal,
                 impuesto,
                 total,
                 recibido,
                 cambio,
                 this.montoLetras.convertir(total),
+                created_at,
+                updated_at,
             ],
         );
 
         if (!resultado?.insertId) {
-            throw new InternalServerErrorException(
-                'No se pudo registrar la factura de contado.',
-            );
+            throw new InternalServerErrorException('No se pudo registrar la factura de contado.');
         }
 
         return {
@@ -205,6 +214,10 @@ INSERT INTO factura_ventas (
         _facturaRegistrada: FacturaContadoRegistrada,
         remisiones: RemisionVentaCreada[],
     ): Promise<void> {
+        this.logger.log(`[DETALLES] Venta=${ventaRegistrada.ventaId}, Unidades=${remisiones.length}`);
+
+        const { created_at, updated_at } = fechaHonduras();
+
         let posicion = 0;
 
         for (const articulo of venta.articulos) {
@@ -232,6 +245,17 @@ INSERT INTO factura_ventas (
                     estado_articulo_id: articulo.estado_articulo_id,
                     combo_id: articulo.combo_id,
                 }, manager);
+
+                if (articulo.es_regalia) {
+                    await manager.query(
+                        'INSERT INTO regalias_ventas (venta_id, articulo_id, estado, created_at, updated_at) VALUES (?, ?, 1, ?, ?)',
+                        [ventaRegistrada.ventaId, articulo.articulo_id, created_at, updated_at],
+                    );
+
+                    this.logger.log(
+                        `[REGALIA] Venta=${ventaRegistrada.ventaId}, Articulo=${articulo.articulo_id}, Remision=${remision.remision_articulo_id}`,
+                    );
+                }
             }
         }
 
@@ -242,6 +266,25 @@ INSERT INTO factura_ventas (
         }
     }
 
+    // NUEVO: Crear orden de entrega dentro de la transacción de facturación.
+    async crearOrdenEntrega(
+        manager: EntityManager,
+        ventaRegistrada: VentaContadoRegistrada,
+    ): Promise<void> {
+        this.logger.log(
+            `[ORDEN_ENTREGA_INICIO] Venta=${ventaRegistrada.codigoVenta} VentaId=${ventaRegistrada.ventaId}`,
+        );
+
+        const orden = await this.ordenEntregaVentas.crear(
+            manager,
+            ventaRegistrada.ventaId,
+        );
+
+        this.logger.log(
+            `[ORDEN_ENTREGA_OK] Venta=${ventaRegistrada.codigoVenta} Orden=${orden.codigo} OrdenId=${orden.ordenEntregaId} RevisadoAdmin=1`,
+        );
+    }
+
     async registrarPago(
         manager: EntityManager,
         venta: VentaContadoValidada,
@@ -249,13 +292,17 @@ INSERT INTO factura_ventas (
         _ventaRegistrada: VentaContadoRegistrada,
         facturaRegistrada: FacturaContadoRegistrada,
     ): Promise<void> {
+        this.logger.log(
+            `[PAGO] Caja=${contexto.cajaId}, Factura=${facturaRegistrada.facturaId}, Total=${venta.total}, Forma=${venta.forma_pago_id}`,
+        );
+
         await this.historialCaja.registrar(manager, {
             caja_id: contexto.cajaId,
             forma_pago_id: venta.forma_pago_id,
             recibo_id: null,
             factura_id: facturaRegistrada.facturaId,
             referencia: facturaRegistrada.codigoFactura,
-            total: venta.total,
+            total: venta.forma_pago_id === '12' ? '0.00' : venta.total,
             tipo: 0,
             tipo_documento: 1,
             historial: venta.observacion || null,
@@ -268,8 +315,10 @@ INSERT INTO factura_ventas (
         _facturaRegistrada: FacturaContadoRegistrada,
     ): Promise<void> {
         const remisionIds = [...new Set(
-            remisiones.map((remision) => String(remision.remision_articulo_id)),
+            remisiones.map(remision => String(remision.remision_articulo_id)),
         )];
+
+        this.logger.log(`[MOTOCICLETAS] Revisando ${remisionIds.length} remisiones`);
 
         if (!remisionIds.length) return;
 
@@ -279,11 +328,11 @@ INSERT INTO factura_ventas (
             facturado: number | string | null;
         }[] = await manager.query(
             `
-SELECT m.id, m.remision_articulo_id, m.facturado
-FROM motocicletas m
-WHERE m.remision_articulo_id IN (${remisionIds.map(() => '?').join(',')})
-FOR UPDATE
-    `,
+                SELECT m.id, m.remision_articulo_id, m.facturado
+                FROM motocicletas m
+                WHERE m.remision_articulo_id IN (${remisionIds.map(() => '?').join(',')})
+                    FOR UPDATE
+            `,
             remisionIds,
         );
 
@@ -297,14 +346,16 @@ FOR UPDATE
             }
         }
 
+        const { updated_at } = fechaHonduras();
+
         const resultado = await manager.query(
             `
-UPDATE motocicletas
-SET facturado = 1, estado_notificar = 1, updated_at = NOW()
-WHERE remision_articulo_id IN (${remisionIds.map(() => '?').join(',')})
-AND (facturado = 0 OR facturado IS NULL)
-`,
-            remisionIds,
+                UPDATE motocicletas
+                SET facturado = 1, estado_notificar = 1, updated_at = ?
+                WHERE remision_articulo_id IN (${remisionIds.map(() => '?').join(',')})
+                  AND (facturado = 0 OR facturado IS NULL)
+            `,
+            [updated_at, ...remisionIds],
         );
 
         if (resultado.affectedRows !== motocicletas.length) {

@@ -1,5 +1,22 @@
-
 import { BadRequestException, Injectable } from '@nestjs/common';
+
+export interface SerieVentaContadoDto {
+    cuerpo_carrito_id: string | number;
+    serie_fabricante: string;
+}
+
+export interface CrearVentaContadoDto {
+    operacion_id: string;
+    carrito_slug: string;
+    cliente_slug: string;
+    modalidad: 'DIRECTO' | 'NOTAS_CREDITO';
+    forma_pago_id: string | number;
+    observacion?: string;
+    monto_recibido?: number | string | null;
+    referencia_pos?: string | null;
+    notas_credito?: string[];
+    series?: SerieVentaContadoDto[];
+}
 
 export interface ArticuloVentaContadoDto {
     articulo_id: string | number;
@@ -14,7 +31,7 @@ export interface ArticuloVentaContadoDto {
     es_regalia?: boolean;
 }
 
-export interface CrearVentaContadoDto {
+export interface DatosVentaContadoInternos {
     operacion_id: string;
     cliente_slug: string;
     forma_pago_id: string | number;
@@ -22,8 +39,20 @@ export interface CrearVentaContadoDto {
     sub_total: number | string;
     impuesto: number | string;
     total: number | string;
-    monto_recibido?: number | string;
+    monto_recibido?: number | string | null;
     articulos: ArticuloVentaContadoDto[];
+}
+
+export interface SolicitudVentaContadoValidada {
+    operacion_id: string;
+    carrito_slug: string;
+    cliente_slug: string;
+    forma_pago_id: string;
+    observacion: string;
+    monto_recibido: string | null;
+    referencia_pos: string | null;
+    notas_credito: string[];
+    series: { cuerpo_carrito_id: string; serie_fabricante: string }[];
 }
 
 export interface ArticuloVentaContadoValidado {
@@ -69,17 +98,13 @@ export class CajaVentaContadoValidacionService {
         const texto = String(valor ?? '').trim();
         const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(texto);
 
-        if (!match) {
-            throw new BadRequestException(`${campo} debe ser un importe válido con máximo dos decimales.`);
-        }
+        if (!match) throw new BadRequestException(`${campo} debe ser un importe válido con máximo dos decimales.`);
 
         const entero = Number(match[1]);
         const decimales = Number((match[2] ?? '').padEnd(2, '0'));
         const resultado = entero * 100 + decimales;
 
-        if (!Number.isSafeInteger(resultado)) {
-            throw new BadRequestException(`${campo} excede el importe permitido.`);
-        }
+        if (!Number.isSafeInteger(resultado)) throw new BadRequestException(`${campo} excede el importe permitido.`);
 
         return resultado;
     }
@@ -107,30 +132,107 @@ export class CajaVentaContadoValidacionService {
         return cantidad;
     }
 
-    validar(datos: CrearVentaContadoDto): VentaContadoValidada {
-        if (!datos || typeof datos !== 'object' || Array.isArray(datos)) {
-            throw new BadRequestException('Debes proporcionar los datos de la venta.');
-        }
-
+    private validarOperacion(valor: unknown): string {
         if (
-            typeof datos.operacion_id !== 'string' ||
-            !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(datos.operacion_id)
+            typeof valor !== 'string' ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(valor)
         ) {
             throw new BadRequestException('Debes proporcionar un UUID de operación válido.');
         }
 
-        if (typeof datos.cliente_slug !== 'string' || !datos.cliente_slug.trim()) {
-            throw new BadRequestException('Debes seleccionar un cliente válido.');
+        return valor.toLowerCase();
+    }
+
+    private validarSlug(valor: unknown, campo: string): string {
+        if (typeof valor !== 'string' || !valor.trim()) {
+            throw new BadRequestException(`${campo} no es válido.`);
         }
 
-        const formaPagoId = this.validarId(datos.forma_pago_id, 'La forma de pago');
+        return valor.trim();
+    }
 
-        if (
-            datos.observacion !== undefined &&
-            (typeof datos.observacion !== 'string' || datos.observacion.length > 400)
-        ) {
+    private validarObservacion(valor: unknown): string {
+        if (valor === undefined || valor === null) return '';
+
+        if (typeof valor !== 'string' || valor.length > 400) {
             throw new BadRequestException('La observación no puede superar los 400 caracteres.');
         }
+
+        return valor.trim();
+    }
+
+    // ==========================================
+    // VALIDAR SOLICITUD DEL FRONTEND
+    // ==========================================
+
+    validarSolicitud(datos: CrearVentaContadoDto): SolicitudVentaContadoValidada {
+        if (!datos || typeof datos !== 'object' || Array.isArray(datos)) {
+            throw new BadRequestException('Los datos de la venta no son válidos.');
+        }
+
+        const operacionId = this.validarOperacion(datos.operacion_id);
+        const carritoSlug = this.validarSlug(datos.carrito_slug, 'El carrito');
+        const clienteSlug = this.validarSlug(datos.cliente_slug, 'El cliente');
+
+        const formaPagoId = this.validarId(datos.forma_pago_id, 'La forma de pago');
+        const esNota = formaPagoId === '12';
+        if (datos.modalidad !== (esNota ? 'NOTAS_CREDITO' : 'DIRECTO')) throw new BadRequestException('La modalidad no coincide con la forma de pago.');
+        if (datos.notas_credito !== undefined && !Array.isArray(datos.notas_credito)) throw new BadRequestException('Las notas de crédito deben enviarse como una lista.');
+        const notas = (datos.notas_credito ?? []).map(nota => this.validarSlug(nota, 'La nota de crédito').toLowerCase());
+        if (notas.some(nota => nota.length > 36) || new Set(notas).size !== notas.length) throw new BadRequestException('Las notas de crédito son inválidas o están repetidas.');
+        if (esNota && !notas.length) throw new BadRequestException('Selecciona las notas de crédito para pagar la factura.');
+        if (!esNota && notas.length) throw new BadRequestException('Esta operación no admite notas de crédito.');
+        const observacion = this.validarObservacion(datos.observacion);
+
+        if (
+            datos.referencia_pos !== undefined &&
+            datos.referencia_pos !== null &&
+            (typeof datos.referencia_pos !== 'string' || datos.referencia_pos.length > 100)
+        ) {
+            throw new BadRequestException('La referencia POS no es válida.');
+        }
+
+        if (datos.series !== undefined && !Array.isArray(datos.series)) throw new BadRequestException('Las series deben enviarse como una lista.');
+        const lineasSeries = new Set<string>();
+        const series = (datos.series ?? []).map(item => {
+            if (!item || typeof item !== 'object' || Array.isArray(item)) throw new BadRequestException('Serie inválida.');
+            const id = this.validarId(item.cuerpo_carrito_id, 'La línea del carrito');
+            if (lineasSeries.has(id)) throw new BadRequestException('La línea tiene más de una serie.');
+            if (typeof item.serie_fabricante !== 'string' || !item.serie_fabricante.trim() || item.serie_fabricante.trim().length > 100) throw new BadRequestException('La serie debe contener entre 1 y 100 caracteres.');
+            lineasSeries.add(id);
+            return { cuerpo_carrito_id: id, serie_fabricante: item.serie_fabricante.trim() };
+        });
+
+        const montoRecibido = datos.monto_recibido === undefined || datos.monto_recibido === null
+            ? null
+            : this.dinero(this.centavos(datos.monto_recibido, 'El monto recibido'));
+
+        return {
+            operacion_id: operacionId,
+            carrito_slug: carritoSlug,
+            cliente_slug: clienteSlug,
+            forma_pago_id: formaPagoId,
+            observacion,
+            monto_recibido: esNota ? null : montoRecibido,
+            notas_credito: notas,
+            referencia_pos: datos.referencia_pos?.trim() || null,
+            series,
+        };
+    }
+
+    // ==========================================
+    // VALIDAR VENTA CON DATOS INTERNOS
+    // ==========================================
+
+    validar(datos: DatosVentaContadoInternos): VentaContadoValidada {
+        if (!datos || typeof datos !== 'object' || Array.isArray(datos)) {
+            throw new BadRequestException('Los datos de la venta no son válidos.');
+        }
+
+        const operacionId = this.validarOperacion(datos.operacion_id);
+        const clienteSlug = this.validarSlug(datos.cliente_slug, 'El cliente');
+        const formaPagoId = this.validarId(datos.forma_pago_id, 'La forma de pago');
+        const observacion = this.validarObservacion(datos.observacion);
 
         if (!Array.isArray(datos.articulos) || datos.articulos.length === 0) {
             throw new BadRequestException('La venta debe contener al menos un artículo.');
@@ -189,6 +291,7 @@ export class CajaVentaContadoValidacionService {
                 if (remisionesUtilizadas.has(remisionArticuloId)) {
                     throw new BadRequestException(`La remisión ${remisionArticuloId} está repetida en la venta.`);
                 }
+
                 remisionesUtilizadas.add(remisionArticuloId);
             }
 
@@ -207,9 +310,7 @@ export class CajaVentaContadoValidacionService {
             }
 
             if ((remisionArticuloId || serieFabricante) && cantidad !== 1) {
-                throw new BadRequestException(
-                    `El artículo ${numero} debe enviarse por unidad cuando tiene remisión o serie del fabricante.`,
-                );
+                throw new BadRequestException(`El artículo ${numero} debe enviarse por unidad cuando tiene remisión o serie del fabricante.`);
             }
 
             const estadoArticuloId = this.validarIdOpcional(
@@ -226,8 +327,6 @@ export class CajaVentaContadoValidacionService {
                 `combo_id del artículo ${numero}`,
             );
 
-            const isRemision: 0 | 1 = 1;
-
             totalCalculado += totalCentavos;
 
             if (!Number.isSafeInteger(totalCalculado)) {
@@ -243,7 +342,7 @@ export class CajaVentaContadoValidacionService {
                 serie_fabricante: serieFabricante,
                 estado_articulo_id: estadoArticuloId,
                 combo_id: comboId,
-                is_remision: isRemision,
+                is_remision: 1,
                 es_regalia: esRegalia,
             });
         }
@@ -264,8 +363,6 @@ export class CajaVentaContadoValidacionService {
             throw new BadRequestException('El subtotal más el impuesto debe coincidir con el total de la venta.');
         }
 
-        // El backend valida el monto recibido y calcula el cambio.
-        // La identificación de efectivo se confirmará contra la tabla forma_pagos.
         const montoRecibido = datos.monto_recibido === undefined || datos.monto_recibido === null
             ? null
             : this.centavos(datos.monto_recibido, 'El monto recibido');
@@ -277,10 +374,10 @@ export class CajaVentaContadoValidacionService {
         const cambio = montoRecibido === null ? 0 : montoRecibido - totalVenta;
 
         return {
-            operacion_id: datos.operacion_id.toLowerCase(),
-            cliente_slug: datos.cliente_slug.trim(),
+            operacion_id: operacionId,
+            cliente_slug: clienteSlug,
             forma_pago_id: formaPagoId,
-            observacion: datos.observacion ?? '',
+            observacion,
             sub_total: this.dinero(subTotal),
             impuesto: this.dinero(impuesto),
             total: this.dinero(totalVenta),

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 
 import { DataSource } from 'typeorm';
+import { fechaHonduras } from '../../common/helpers/fecha.helper.js';
 
 // ============================================
 // INTERFACES
@@ -154,46 +155,9 @@ export class CajaConsultaService {
         fecha_hora: string;
         zona_horaria: string;
     } {
-        const ahora = new Date();
+        const { fecha, hora, fecha_hora, zona_horaria } = fechaHonduras();
 
-        const partes = new Intl.DateTimeFormat(
-            'en-US',
-            {
-                timeZone: 'America/Tegucigalpa',
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false,
-                hourCycle: 'h23',
-            },
-        ).formatToParts(ahora);
-
-        const obtener = (tipo: string) =>
-            partes.find(
-                (parte) => parte.type === tipo,
-            )?.value ?? '';
-
-        const fecha = [
-            obtener('year'),
-            obtener('month'),
-            obtener('day'),
-        ].join('-');
-
-        const hora = [
-            obtener('hour'),
-            obtener('minute'),
-            obtener('second'),
-        ].join(':');
-
-        return {
-            fecha,
-            hora,
-            fecha_hora: ahora.toISOString(),
-            zona_horaria: 'America/Tegucigalpa',
-        };
+        return { fecha, hora, fecha_hora, zona_horaria };
     }
 
     // ============================================
@@ -364,52 +328,62 @@ hc.fecha DESC,
     // MÉTODO PRINCIPAL
     // ============================================
 
-    async consultarPorSlug(slug: string) {
+    async consultarPorSlug(slug: string, fecha?: string) {
         const inicio = Date.now();
-
         const slugLimpio = slug?.trim();
 
         if (!slugLimpio) {
-            throw new BadRequestException(
-                'Debe proporcionar el slug de la caja.',
-            );
+            throw new BadRequestException('Debe proporcionar el slug de la caja.');
         }
 
         const prefijo = `[CAJA:${slugLimpio}]`;
 
-        this.logger.log(
-            `${prefijo} INICIANDO CONSULTA`,
-        );
+        this.logger.log(`${prefijo} INICIANDO CONSULTA`);
 
         // ========================================
         // 1. DATOS DE CAJA
         // ========================================
 
-        const caja = await this.buscarCaja(
-            slugLimpio,
-        );
+        const caja = await this.buscarCaja(slugLimpio);
 
-        this.logger.log(
-            `${prefijo} Caja encontrada: ${caja.codigo}`,
-        );
+        this.logger.log(`${prefijo} Caja encontrada: ${caja.codigo}`);
 
         // ========================================
-        // 2. HISTORIAL DEL DIA (HORA DE HONDURAS)
+        // 2. VALIDAR FECHA DE CONSULTA
         // ========================================
 
         const consulta = this.fechaConsulta();
 
-        const movimientos = await this.buscarHistorial(
-            caja.id,
-            consulta.fecha,
-        );
+        if (fecha !== undefined) {
+            const fechaSolicitada = fecha.trim();
 
-        this.logger.log(
-            `${prefijo} Historial del ${consulta.fecha}: ${movimientos.length} movimientos`,
-        );
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaSolicitada)) {
+                throw new BadRequestException('La fecha debe tener el formato YYYY-MM-DD.');
+            }
+
+            const fechaValidada = new Date(`${fechaSolicitada}T00:00:00.000Z`);
+
+            if (Number.isNaN(fechaValidada.getTime()) || fechaValidada.toISOString().slice(0, 10) !== fechaSolicitada) {
+                throw new BadRequestException('La fecha proporcionada no es válida.');
+            }
+
+            if (fechaSolicitada > consulta.fecha) {
+                throw new BadRequestException('No se pueden consultar fechas futuras.');
+            }
+
+            consulta.fecha = fechaSolicitada;
+        }
 
         // ========================================
-        // 3. RESUMEN GENERAL
+        // 3. CONSULTAR HISTORIAL DE LA FECHA
+        // ========================================
+
+        const movimientos = await this.buscarHistorial(caja.id, consulta.fecha);
+
+        this.logger.log(`${prefijo} Historial del ${consulta.fecha}: ${movimientos.length} movimientos`);
+
+        // ========================================
+        // 4. RESUMEN GENERAL
         // ========================================
 
         let totalIngresos = 0;
@@ -420,266 +394,163 @@ hc.fecha DESC,
         let cantidadNeutros = 0;
         let cantidadPendientes = 0;
 
-        const formasPago = new Map<
-            string,
-            FormaPagoResumen
-            >();
+        const formasPago = new Map<string, FormaPagoResumen>();
 
         // ========================================
-        // 4. PROCESAR HISTORIAL
+        // 5. PROCESAR HISTORIAL
         // ========================================
 
-        const historial = movimientos.map(
-            (movimiento) => {
+        const historial = movimientos.map((movimiento) => {
 
-                const tipoDocumento = this.numero(
-                    movimiento.tipo_documento,
-                );
+            const tipoDocumento = this.numero(movimiento.tipo_documento);
+            const tipo = this.numero(movimiento.tipo);
+            const monto = this.numero(movimiento.total);
+            const clasificacion = this.clasificar(tipoDocumento, tipo);
 
-                const tipo = this.numero(
-                    movimiento.tipo,
-                );
+            let impactoSaldo = 0;
 
-                const monto = this.numero(
-                    movimiento.total,
-                );
+            if (clasificacion.efecto === 'INGRESO') {
+                totalIngresos += monto;
+                cantidadIngresos++;
+                impactoSaldo = monto;
+            }
 
-                const clasificacion = this.clasificar(
-                    tipoDocumento,
-                    tipo,
-                );
+            if (clasificacion.efecto === 'EGRESO') {
+                totalEgresos += monto;
+                cantidadEgresos++;
+                impactoSaldo = -monto;
+            }
 
-                let impactoSaldo = 0;
+            if (clasificacion.efecto === 'NEUTRO') {
+                cantidadNeutros++;
+            }
 
-                if (
-                    clasificacion.efecto === 'INGRESO'
-                ) {
-                    totalIngresos += monto;
-                    cantidadIngresos++;
+            if (clasificacion.efecto === 'PENDIENTE') {
+                cantidadPendientes++;
+            }
 
-                    impactoSaldo = monto;
-                }
+            // ====================================
+            // AGRUPAR POR FORMA DE PAGO
+            // ====================================
 
-                if (
-                    clasificacion.efecto === 'EGRESO'
-                ) {
-                    totalEgresos += monto;
-                    cantidadEgresos++;
+            const formaPagoId = String(movimiento.forma_pago_id);
 
-                    impactoSaldo = -monto;
-                }
+            if (!formasPago.has(formaPagoId)) {
+                formasPago.set(formaPagoId, {
+                    id: formaPagoId,
+                    nombre: movimiento.forma_pago_nombre ?? 'Sin identificar',
+                    is_tarjeta: Number(movimiento.forma_pago_is_tarjeta ?? 0) === 1,
+                    cuenta_banco_id: movimiento.forma_pago_cuenta_banco_id,
 
-                if (
-                    clasificacion.efecto === 'NEUTRO'
-                ) {
-                    cantidadNeutros++;
-                }
+                    cantidad_movimientos: 0,
+                    cantidad_ingresos: 0,
+                    cantidad_egresos: 0,
+                    cantidad_neutros: 0,
+                    cantidad_pendientes: 0,
 
-                if (
-                    clasificacion.efecto === 'PENDIENTE'
-                ) {
-                    cantidadPendientes++;
-                }
+                    total_ingresos: 0,
+                    total_egresos: 0,
+                    neto: 0,
+                });
+            }
 
-                // ====================================
-                // AGRUPAR POR FORMA DE PAGO
-                // ====================================
+            const forma = formasPago.get(formaPagoId)!;
 
-                const formaPagoId = String(
-                    movimiento.forma_pago_id,
-                );
+            forma.cantidad_movimientos++;
 
-                if (!formasPago.has(formaPagoId)) {
-                    formasPago.set(
-                        formaPagoId,
-                        {
-                            id: formaPagoId,
+            if (clasificacion.efecto === 'INGRESO') {
+                forma.cantidad_ingresos++;
+                forma.total_ingresos += monto;
+                forma.neto += monto;
+            }
 
-                            nombre:
-                                movimiento.forma_pago_nombre ??
-                                'Sin identificar',
+            if (clasificacion.efecto === 'EGRESO') {
+                forma.cantidad_egresos++;
+                forma.total_egresos += monto;
+                forma.neto -= monto;
+            }
 
-                            is_tarjeta:
-                                Number(
-                                    movimiento.forma_pago_is_tarjeta ?? 0,
-                                ) === 1,
+            if (clasificacion.efecto === 'NEUTRO') {
+                forma.cantidad_neutros++;
+            }
 
-                            cuenta_banco_id:
-                            movimiento.forma_pago_cuenta_banco_id,
+            if (clasificacion.efecto === 'PENDIENTE') {
+                forma.cantidad_pendientes++;
+            }
 
-                            cantidad_movimientos: 0,
-                            cantidad_ingresos: 0,
-                            cantidad_egresos: 0,
-                            cantidad_neutros: 0,
-                            cantidad_pendientes: 0,
+            // ====================================
+            // REFERENCIAS DE DOCUMENTOS
+            // ====================================
 
-                            total_ingresos: 0,
-                            total_egresos: 0,
-                            neto: 0,
-                        },
-                    );
-                }
+            const documento = {
+                recibo: movimiento.recibo_id
+                    ? {
+                        id: movimiento.recibo_id,
+                        codigo: movimiento.recibo_codigo,
+                        referencia: movimiento.recibo_referencia,
+                    }
+                    : null,
 
-                const forma = formasPago.get(
-                    formaPagoId,
-                )!;
+                factura: movimiento.factura_id
+                    ? {
+                        id: movimiento.factura_id,
+                        contador: movimiento.factura_contador,
+                        archivo: movimiento.factura_file,
+                    }
+                    : null,
+            };
 
-                forma.cantidad_movimientos++;
+            return {
+                id: movimiento.id,
+                fecha: this.fechaTexto(movimiento.fecha),
+                created_at: movimiento.created_at,
+                updated_at: movimiento.updated_at,
+                referencia: movimiento.referencia,
+                historial: movimiento.historial,
+                tipo_documento: tipoDocumento,
+                tipo,
+                clasificacion: clasificacion.codigo,
+                descripcion_tipo: clasificacion.nombre,
+                efecto: clasificacion.efecto,
+                total: this.dinero(monto),
+                impacto_saldo: this.dinero(impactoSaldo),
 
-                if (
-                    clasificacion.efecto === 'INGRESO'
-                ) {
-                    forma.cantidad_ingresos++;
-                    forma.total_ingresos += monto;
-                    forma.neto += monto;
-                }
+                forma_pago: {
+                    id: formaPagoId,
+                    nombre: movimiento.forma_pago_nombre ?? 'Sin identificar',
+                    is_tarjeta: Number(movimiento.forma_pago_is_tarjeta ?? 0) === 1,
+                    cuenta_banco_id: movimiento.forma_pago_cuenta_banco_id,
+                },
 
-                if (
-                    clasificacion.efecto === 'EGRESO'
-                ) {
-                    forma.cantidad_egresos++;
-                    forma.total_egresos += monto;
-                    forma.neto -= monto;
-                }
-
-                if (
-                    clasificacion.efecto === 'NEUTRO'
-                ) {
-                    forma.cantidad_neutros++;
-                }
-
-                if (
-                    clasificacion.efecto === 'PENDIENTE'
-                ) {
-                    forma.cantidad_pendientes++;
-                }
-
-                // ====================================
-                // REFERENCIAS DE DOCUMENTOS
-                // ====================================
-
-                const documento = {
-                    recibo: movimiento.recibo_id
-                        ? {
-                            id: movimiento.recibo_id,
-                            codigo: movimiento.recibo_codigo,
-                            referencia: movimiento.recibo_referencia,
-                        }
-                        : null,
-
-                    factura: movimiento.factura_id
-                        ? {
-                            id: movimiento.factura_id,
-                            contador: movimiento.factura_contador,
-                            archivo: movimiento.factura_file,
-                        }
-                        : null,
-                };
-
-                return {
-                    id: movimiento.id,
-
-                    fecha: this.fechaTexto(
-                        movimiento.fecha,
-                    ),
-
-                    created_at:
-                    movimiento.created_at,
-
-                    updated_at:
-                    movimiento.updated_at,
-
-                    referencia:
-                    movimiento.referencia,
-
-                    historial:
-                    movimiento.historial,
-
-                    tipo_documento:
-                    tipoDocumento,
-
-                    tipo,
-
-                    clasificacion:
-                    clasificacion.codigo,
-
-                    descripcion_tipo:
-                    clasificacion.nombre,
-
-                    efecto:
-                    clasificacion.efecto,
-
-                    total: this.dinero(monto),
-
-                    impacto_saldo:
-                        this.dinero(impactoSaldo),
-
-                    forma_pago: {
-                        id: formaPagoId,
-                        nombre:
-                            movimiento.forma_pago_nombre ??
-                            'Sin identificar',
-
-                        is_tarjeta:
-                            Number(
-                                movimiento.forma_pago_is_tarjeta ?? 0,
-                            ) === 1,
-
-                        cuenta_banco_id:
-                        movimiento.forma_pago_cuenta_banco_id,
-                    },
-
-                    documento,
-
-                    // La entidad de egresos todavía no
-                    // fue proporcionada. No inventamos
-                    // una relación ni una URL.
-                    url_egreso: null,
-                };
-            },
-        );
+                documento,
+                url_egreso: null,
+            };
+        });
 
         // ========================================
-        // 5. PREPARAR RESUMEN FORMAS DE PAGO
+        // 6. PREPARAR RESUMEN FORMAS DE PAGO
         // ========================================
 
-        const resumenFormasPago = Array.from(
-            formasPago.values(),
-        ).map((forma) => ({
+        const resumenFormasPago = Array.from(formasPago.values()).map((forma) => ({
             ...forma,
-
-            total_ingresos: this.dinero(
-                forma.total_ingresos,
-            ),
-
-            total_egresos: this.dinero(
-                forma.total_egresos,
-            ),
-
-            neto: this.dinero(
-                forma.neto,
-            ),
+            total_ingresos: this.dinero(forma.total_ingresos),
+            total_egresos: this.dinero(forma.total_egresos),
+            neto: this.dinero(forma.neto),
         }));
 
         // ========================================
-        // 6. SALDOS DE CAJA
+        // 7. SALDOS ACTUALES DE CAJA
         // ========================================
 
-        // Saldo real almacenado en cajas.total.
-        // No se recalcula sumando todo el historial,
-        // porque puede incluir movimientos de
-        // jornadas anteriores y diferentes formas
-        // de pago.
-        const saldoActual = this.numero(
-            caja.total,
-        );
+        // Estos valores corresponden al estado actual
+        // de la caja, independientemente de la fecha
+        // seleccionada para consultar el historial.
 
-        const saldoAcumulado = this.numero(
-            caja.saldo_acumulado,
-        );
+        const saldoActual = this.numero(caja.total);
+        const saldoAcumulado = this.numero(caja.saldo_acumulado);
 
         // ========================================
-        // 7. RESPUESTA
+        // 8. PREPARAR RESPUESTA
         // ========================================
 
         const resultado = {
@@ -689,82 +560,51 @@ hc.fecha DESC,
                 num_caja: caja.num_caja,
 
                 sucursal: {
-                    nombre:
-                    caja.sucursal_nombre,
-
-                    codigo:
-                    caja.sucursal_codigo,
-
-                    abreviatura:
-                    caja.sucursal_abreviatura,
+                    nombre: caja.sucursal_nombre,
+                    codigo: caja.sucursal_codigo,
+                    abreviatura: caja.sucursal_abreviatura,
                 },
 
                 estado: caja.estado,
                 activa: caja.activa,
                 estado_cierre: caja.estado_cierre,
                 is_conta: caja.is_conta,
-
                 hora_inicio: caja.hora_inicio,
                 hora_cierre: caja.hora_cierre,
-
                 registro: caja.registro,
             },
 
             consulta,
 
             saldos: {
-                saldo_actual: this.dinero(
-                    saldoActual,
-                ),
-
-                saldo_acumulado: this.dinero(
-                    saldoAcumulado,
-                ),
-
-                // Total_inicio es tinyint según
-                // la entidad. No se interpreta
-                // como importe monetario.
+                saldo_actual: this.dinero(saldoActual),
+                saldo_acumulado: this.dinero(saldoAcumulado),
                 total_inicio: caja.total_inicio,
             },
 
             resumen: {
-                total_ingresos: this.dinero(
-                    totalIngresos,
-                ),
-
-                total_egresos: this.dinero(
-                    totalEgresos,
-                ),
-
-                neto_movimientos_clasificados:
-                    this.dinero(
-                        totalIngresos - totalEgresos,
-                    ),
-
-                cantidad_movimientos:
-                historial.length,
-
-                cantidad_ingresos:
-                cantidadIngresos,
-
-                cantidad_egresos:
-                cantidadEgresos,
-
-                cantidad_neutros:
-                cantidadNeutros,
-
-                cantidad_pendientes:
-                cantidadPendientes,
+                total_ingresos: this.dinero(totalIngresos),
+                total_egresos: this.dinero(totalEgresos),
+                neto_movimientos_clasificados: this.dinero(totalIngresos - totalEgresos),
+                cantidad_movimientos: historial.length,
+                cantidad_ingresos: cantidadIngresos,
+                cantidad_egresos: cantidadEgresos,
+                cantidad_neutros: cantidadNeutros,
+                cantidad_pendientes: cantidadPendientes,
             },
 
             formas_pago: resumenFormasPago,
-
             historial,
         };
+
+        // ========================================
+        // 9. REGISTRAR RESULTADO DE LA CONSULTA
+        // ========================================
 
         this.logger.log(
             `${prefijo} CONSULTA COMPLETADA: ` +
             JSON.stringify({
+                fecha_consultada: consulta.fecha,
                 saldo_actual: saldoActual,
                 movimientos: historial.length,
                 formas_pago: resumenFormasPago.length,

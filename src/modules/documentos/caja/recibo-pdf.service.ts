@@ -1,9 +1,9 @@
-
 import { Injectable, Logger } from '@nestjs/common';
 import puppeteer from 'puppeteer';
 import QRCode from 'qrcode';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { fechaHonduras } from '../../../common/helpers/fecha.helper.js';
 
 export interface DatosReciboPdf {
     qr_token: string;
@@ -59,73 +59,52 @@ export class ReciboPdfService {
     }
 
     private fechaHoraGeneracion(): string {
-        return new Intl.DateTimeFormat('es-HN', {
-            timeZone: 'America/Tegucigalpa',
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false,
-        }).format(new Date());
+        const { fecha, hora } = fechaHonduras();
+        const [anio, mes, dia] = fecha.split('-');
+
+        return `${dia}/${mes}/${anio}, ${hora}`;
     }
 
     async generar(datos: DatosReciboPdf): Promise<Buffer> {
         const inicio = Date.now();
         const prefijo = `[PDF:${datos.codigo}]`;
 
-        let browser:
-            | Awaited<ReturnType<typeof puppeteer.launch>>
-            | undefined;
+        let browser: Awaited<ReturnType<typeof puppeteer.launch>> | undefined;
 
         try {
             this.logger.log(`${prefijo} INICIO`);
 
             if (!datos.codigo?.trim()) {
-                throw new Error(
-                    'Código del recibo no proporcionado.',
-                );
+                throw new Error('Código del recibo no proporcionado.');
             }
 
             if (!datos.qr_token?.trim()) {
-                throw new Error(
-                    'Token QR no proporcionado.',
-                );
+                throw new Error('Token QR no proporcionado.');
             }
 
             // ======================================
             // 1. GENERAR QR
             // ======================================
 
-            this.logger.log(
-                `${prefijo} PASO 1: Generando QR`,
-            );
+            this.logger.log(`${prefijo} PASO 1: Generando QR`);
 
             const urlVerificacion =
                 'https://surtilainez.com/surti/qr/' +
                 encodeURIComponent(datos.qr_token);
 
-            const qrImagen = await QRCode.toDataURL(
-                urlVerificacion,
-                {
-                    width: 300,
-                    margin: 1,
-                    errorCorrectionLevel: 'M',
-                },
-            );
+            const qrImagen = await QRCode.toDataURL(urlVerificacion, {
+                width: 300,
+                margin: 1,
+                errorCorrectionLevel: 'M',
+            });
 
-            this.logger.log(
-                `${prefijo} PASO 1 OK`,
-            );
+            this.logger.log(`${prefijo} PASO 1 OK`);
 
             // ======================================
             // 2. LEER PLANTILLA
             // ======================================
 
-            this.logger.log(
-                `${prefijo} PASO 2: Leyendo plantilla`,
-            );
+            this.logger.log(`${prefijo} PASO 2: Leyendo plantilla`);
 
             const rutaPlantilla = join(
                 process.cwd(),
@@ -137,32 +116,20 @@ export class ReciboPdfService {
                 'recibo.html',
             );
 
-            let html = await readFile(
-                rutaPlantilla,
-                'utf8',
-            );
+            let html = await readFile(rutaPlantilla, 'utf8');
 
-            this.logger.log(
-                `${prefijo} PASO 2 OK: ${rutaPlantilla}`,
-            );
+            this.logger.log(`${prefijo} PASO 2 OK: ${rutaPlantilla}`);
 
             // ======================================
             // 3. PREPARAR MOVIMIENTOS
             // ======================================
 
-            this.logger.log(
-                `${prefijo} PASO 3: Preparando movimientos`,
-            );
+            this.logger.log(`${prefijo} PASO 3: Preparando movimientos`);
 
             const movimientosHtml = datos.movimientos
                 .map((movimiento) => {
-                    const concepto = this.escaparHtml(
-                        movimiento.concepto,
-                    );
-
-                    const monto = this.formatoMonto(
-                        movimiento.monto,
-                    );
+                    const concepto = this.escaparHtml(movimiento.concepto);
+                    const monto = this.formatoMonto(movimiento.monto);
 
                     return `
                         <div class="fila movimiento">
@@ -173,122 +140,68 @@ export class ReciboPdfService {
                 })
                 .join('');
 
-            const fechaHoraGeneracion =
-                this.fechaHoraGeneracion();
+            const fechaHoraGeneracion = this.fechaHoraGeneracion();
 
             // ======================================
             // 4. VARIABLES HTML
             // ======================================
 
             const reemplazos: Record<string, string> = {
-                EMPRESA: this.escaparHtml(
-                    datos.empresa,
-                ),
+                EMPRESA: this.escaparHtml(datos.empresa),
 
-                SUCURSAL: this.escaparHtml(
-                    datos.sucursal,
-                ),
+                SUCURSAL: this.escaparHtml(datos.sucursal),
 
-                SUCURSAL_CODIGO: this.escaparHtml(
-                    datos.sucursal_codigo,
-                ),
+                SUCURSAL_CODIGO: this.escaparHtml(datos.sucursal_codigo),
 
-                SUCURSAL_DIRECCION: this.escaparHtml(
-                    datos.sucursal_direccion,
-                ),
+                SUCURSAL_DIRECCION: this.escaparHtml(datos.sucursal_direccion),
 
-                SUCURSAL_TELEFONO: this.escaparHtml(
-                    datos.sucursal_telefono,
-                ),
+                SUCURSAL_TELEFONO: this.escaparHtml(datos.sucursal_telefono),
 
-                SUCURSAL_EMAIL: this.escaparHtml(
-                    datos.sucursal_email,
-                ),
+                SUCURSAL_EMAIL: this.escaparHtml(datos.sucursal_email),
 
-                CODIGO: this.escaparHtml(
-                    datos.codigo,
-                ),
+                CODIGO: this.escaparHtml(datos.codigo),
 
-                REFERENCIA: this.escaparHtml(
-                    datos.referencia,
-                ),
+                REFERENCIA: this.escaparHtml(datos.referencia),
 
-                FECHA: this.escaparHtml(
-                    datos.fecha,
-                ),
+                FECHA: this.escaparHtml(datos.fecha),
 
-                HORA: this.escaparHtml(
-                    datos.hora,
-                ),
+                HORA: this.escaparHtml(datos.hora),
 
-                CAJA: this.escaparHtml(
-                    datos.caja,
-                ),
+                CAJA: this.escaparHtml(datos.caja),
 
-                USUARIO: this.escaparHtml(
-                    datos.usuario,
-                ),
+                USUARIO: this.escaparHtml(datos.usuario),
 
-                CUENTA: this.escaparHtml(
-                    datos.cuenta,
-                ),
+                CUENTA: this.escaparHtml(datos.cuenta),
 
-                CLIENTE: this.escaparHtml(
-                    datos.cliente,
-                ),
+                CLIENTE: this.escaparHtml(datos.cliente),
 
-                COMENTARIO: this.escaparHtml(
-                    datos.comentario,
-                ),
+                COMENTARIO: this.escaparHtml(datos.comentario),
 
-                PAGO: this.escaparHtml(
-                    datos.pago,
-                ),
+                PAGO: this.escaparHtml(datos.pago),
 
                 MOVIMIENTOS: movimientosHtml,
 
-                TOTAL: this.formatoMonto(
-                    datos.total,
-                ),
+                TOTAL: this.formatoMonto(datos.total),
 
-                TOTAL_CAPITAL: this.formatoMonto(
-                    datos.total_capital,
-                ),
+                TOTAL_CAPITAL: this.formatoMonto(datos.total_capital),
 
-                TOTAL_MORA: this.formatoMonto(
-                    datos.total_mora,
-                ),
+                TOTAL_MORA: this.formatoMonto(datos.total_mora),
 
-                SALDO_ANTERIOR: this.formatoMonto(
-                    datos.saldo_anterior,
-                ),
+                SALDO_ANTERIOR: this.formatoMonto(datos.saldo_anterior),
 
-                SALDO_NUEVO: this.formatoMonto(
-                    datos.saldo_nuevo,
-                ),
+                SALDO_NUEVO: this.formatoMonto(datos.saldo_nuevo),
 
-                MONTO_LETRAS: this.escaparHtml(
-                    datos.monto_letras,
-                ),
+                MONTO_LETRAS: this.escaparHtml(datos.monto_letras),
 
                 QR_IMAGEN: qrImagen,
 
-                QR_TOKEN: this.escaparHtml(
-                    datos.qr_token,
-                ),
+                QR_TOKEN: this.escaparHtml(datos.qr_token),
 
-                FECHA_GENERACION: this.escaparHtml(
-                    fechaHoraGeneracion,
-                ),
+                FECHA_GENERACION: this.escaparHtml(fechaHoraGeneracion),
             };
 
-            for (const [clave, valor] of Object.entries(
-                reemplazos,
-            )) {
-                html = html.replaceAll(
-                    `{{${clave}}}`,
-                    valor,
-                );
+            for (const [clave, valor] of Object.entries(reemplazos)) {
+                html = html.replaceAll(`{{${clave}}}`, valor);
             }
 
             // ======================================
@@ -296,9 +209,7 @@ export class ReciboPdfService {
             // ======================================
 
             const pendientes = [
-                ...html.matchAll(
-                    /\{\{([A-Z_]+)\}\}/g,
-                ),
+                ...html.matchAll(/\{\{([A-Z_]+)\}\}/g),
             ].map((m) => m[1]);
 
             if (pendientes.length > 0) {
@@ -317,15 +228,11 @@ export class ReciboPdfService {
             // 6. INICIAR CHROMIUM
             // ======================================
 
-            this.logger.log(
-                `${prefijo} PASO 4: Iniciando Chromium`,
-            );
+            this.logger.log(`${prefijo} PASO 4: Iniciando Chromium`);
 
             browser = await puppeteer.launch({
                 headless: true,
-                executablePath:
-                    process.env.PUPPETEER_EXECUTABLE_PATH ||
-                    undefined,
+                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
@@ -348,44 +255,34 @@ export class ReciboPdfService {
                 await document.fonts.ready;
 
                 await Promise.all(
-                    Array.from(document.images).map(
-                        async (img) => {
-                            if (!img.complete) {
-                                await new Promise<void>(
-                                    (resolve) => {
-                                        img.addEventListener(
-                                            'load',
-                                            () => resolve(),
-                                            { once: true },
-                                        );
-
-                                        img.addEventListener(
-                                            'error',
-                                            () => resolve(),
-                                            { once: true },
-                                        );
-                                    },
+                    Array.from(document.images).map(async (img) => {
+                        if (!img.complete) {
+                            await new Promise<void>((resolve) => {
+                                img.addEventListener(
+                                    'load',
+                                    () => resolve(),
+                                    { once: true },
                                 );
-                            }
-                        },
-                    ),
+
+                                img.addEventListener(
+                                    'error',
+                                    () => resolve(),
+                                    { once: true },
+                                );
+                            });
+                        }
+                    }),
                 );
             });
 
-            const diagnostico = await page.evaluate(
-                () => ({
-                    texto: document.body.innerText.length,
-                    imagenes: document.images.length,
-                    imagenesCargadas: Array.from(
-                        document.images,
-                    ).filter(
-                        (img) =>
-                            img.complete &&
-                            img.naturalWidth > 0,
-                    ).length,
-                    altura: document.body.scrollHeight,
-                }),
-            );
+            const diagnostico = await page.evaluate(() => ({
+                texto: document.body.innerText.length,
+                imagenes: document.images.length,
+                imagenesCargadas: Array.from(document.images).filter(
+                    (img) => img.complete && img.naturalWidth > 0,
+                ).length,
+                altura: document.body.scrollHeight,
+            }));
 
             this.logger.log(
                 `${prefijo} PASO 4 OK: ` +
@@ -393,27 +290,18 @@ export class ReciboPdfService {
             );
 
             if (diagnostico.texto === 0) {
-                throw new Error(
-                    'La plantilla no contiene texto visible.',
-                );
+                throw new Error('La plantilla no contiene texto visible.');
             }
 
-            if (
-                diagnostico.imagenesCargadas <
-                diagnostico.imagenes
-            ) {
-                throw new Error(
-                    'Una o más imágenes del recibo no cargaron.',
-                );
+            if (diagnostico.imagenesCargadas < diagnostico.imagenes) {
+                throw new Error('Una o más imágenes del recibo no cargaron.');
             }
 
             // ======================================
             // 8. CALCULAR ALTURA DINÁMICA
             // ======================================
 
-            this.logger.log(
-                `${prefijo} PASO 5: Calculando altura`,
-            );
+            this.logger.log(`${prefijo} PASO 5: Calculando altura`);
 
             const alturaPx = await page.evaluate(() => {
                 const body = document.body;
@@ -444,9 +332,7 @@ export class ReciboPdfService {
             // 9. GENERAR PDF DE 80 MM
             // ======================================
 
-            this.logger.log(
-                `${prefijo} PASO 6: Generando PDF`,
-            );
+            this.logger.log(`${prefijo} PASO 6: Generando PDF`);
 
             const pdf = await page.pdf({
                 width: '80mm',
@@ -463,13 +349,8 @@ export class ReciboPdfService {
 
             const resultado = Buffer.from(pdf);
 
-            if (
-                resultado.subarray(0, 5).toString('ascii') !==
-                '%PDF-'
-            ) {
-                throw new Error(
-                    'Chromium no generó un PDF válido.',
-                );
+            if (resultado.subarray(0, 5).toString('ascii') !== '%PDF-') {
+                throw new Error('Chromium no generó un PDF válido.');
             }
 
             this.logger.log(

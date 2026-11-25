@@ -1,4 +1,3 @@
-
 import {
     BadRequestException,
     ConflictException,
@@ -7,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { EntityManager } from 'typeorm';
+import { fechaHonduras } from '../../common/helpers/fecha.helper.js';
 
 export interface ArticuloInventarioVenta {
     articulo_id: string | number;
@@ -77,12 +77,26 @@ export class InventarioVentasService {
     }
 
     private generarSerieSistema(): string {
-        const fecha = new Date();
-        const anio = fecha.getFullYear();
-        const mes = String(fecha.getMonth() + 1).padStart(2, '0');
-        const dia = String(fecha.getDate()).padStart(2, '0');
+        const { fecha } = fechaHonduras();
+        const [anio, mes, dia] = fecha.split('-');
         const aleatorio = randomBytes(4).toString('hex').toUpperCase();
         return `${anio}${mes}${dia}${aleatorio}`;
+    }
+
+    async crearRemisionParaVenta(manager: EntityManager, articuloId: string, sucursalId: string, serieFabricante: string, precio: string, estado: 1 | 2): Promise<string> {
+        if (!manager.queryRunner?.isTransactionActive) throw new InternalServerErrorException('Se requiere una transacción activa.');
+        const articulo = this.validarId(articuloId, 'El artículo');
+        const sucursal = this.validarId(sucursalId, 'La sucursal');
+        const importe = this.validarPrecio(precio);
+        const serie = serieFabricante.trim();
+        if (!serie || serie.length > 100 || ![1, 2].includes(estado)) throw new BadRequestException('Serie o estado inválido.');
+        const ahora = new Date();
+        const resultado = await manager.query(
+            `INSERT INTO remision_articulos (estado_articulo_id, precio_inicial, precio_actual, serie_sistema, serie_fabricante, sucursal_id, articulo_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [estado, importe, importe, this.generarSerieSistema(), serie, sucursal, articulo, ahora, ahora],
+        );
+        if (!resultado.insertId) throw new InternalServerErrorException('No se pudo crear la remisión del artículo.');
+        return String(resultado.insertId);
     }
 
     private async crearRemision(
@@ -94,14 +108,15 @@ export class InventarioVentasService {
     ): Promise<RemisionVentaCreada> {
         const serieSistema = this.generarSerieSistema();
         const serieFinal = serieFabricante?.trim() || serieSistema;
+        const ahora = new Date();
 
         const resultado = await manager.query(
             `INSERT INTO remision_articulos (
                 estado_articulo_id, precio_inicial, precio_actual,
                 serie_sistema, serie_fabricante, sucursal_id, articulo_id,
                 created_at, updated_at
-            ) VALUES (5, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-            [precio, precio, serieSistema, serieFinal, sucursalId, articuloId],
+            ) VALUES (5, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [precio, precio, serieSistema, serieFinal, sucursalId, articuloId, ahora, ahora],
         );
 
         if (!resultado.insertId) {
@@ -130,7 +145,7 @@ export class InventarioVentasService {
                     serie_sistema, serie_fabricante
              FROM remision_articulos
              WHERE id = ?
-             FOR UPDATE`,
+                 FOR UPDATE`,
             [remisionId],
         );
 
@@ -176,9 +191,9 @@ export class InventarioVentasService {
     ): Promise<RemisionVentaCreada> {
         const resultado = await manager.query(
             `UPDATE remision_articulos
-             SET estado_articulo_id = 5, updated_at = NOW()
+             SET estado_articulo_id = 5, updated_at = ?
              WHERE id = ? AND estado_articulo_id IN (1, 2, 3)`,
-            [remision.id],
+            [new Date(), remision.id],
         );
 
         if (resultado.affectedRows !== 1) {
@@ -206,7 +221,7 @@ export class InventarioVentasService {
             `SELECT id, stock_actual, stock_consignado, stock_reingreso
              FROM stock_articulos
              WHERE articulo_id = ? AND sucursal_id = ?
-             FOR UPDATE`,
+                 FOR UPDATE`,
             [articuloId, sucursalId],
         );
 
@@ -242,9 +257,9 @@ export class InventarioVentasService {
 
         const resultado = await manager.query(
             `UPDATE stock_articulos
-             SET ${columna} = ${columna} - ?, updated_at = NOW()
+             SET ${columna} = ${columna} - ?, updated_at = ?
              WHERE id = ? AND ${columna} >= ?`,
-            [cantidad, stock.id, cantidad],
+            [cantidad, new Date(), stock.id, cantidad],
         );
 
         if (resultado.affectedRows !== 1) {
@@ -265,6 +280,7 @@ export class InventarioVentasService {
         posterior: number,
         esRegalia: boolean,
     ): Promise<void> {
+        const ahora = new Date();
         await manager.query(
             `INSERT INTO kardex_articulos (
                 referencia, articulo_id, remision_articulo_id,
@@ -273,9 +289,9 @@ export class InventarioVentasService {
                 cantidad, stock_anterior, stock_posterior, user_id,
                 observacion, fecha_movimiento, created_at, updated_at
             ) VALUES (
-                ?, ?, ?, 'SALIDA', ?, 'FACTURA_CONTADO',
-                ?, ?, ?, NULL, 1, ?, ?, ?, ?, NOW(), NOW(), NOW()
-            )`,
+                         ?, ?, ?, 'SALIDA', ?, 'FACTURA_CONTADO',
+                         ?, ?, ?, NULL, 1, ?, ?, ?, ?, ?, ?, ?
+                     )`,
             [
                 datos.factura_cod,
                 articuloId,
@@ -290,6 +306,7 @@ export class InventarioVentasService {
                 esRegalia
                     ? `Regalía registrada en factura ${datos.factura_cod}`
                     : `Venta registrada en factura ${datos.factura_cod}`,
+                ahora, ahora, ahora,
             ],
         );
     }
@@ -301,6 +318,7 @@ export class InventarioVentasService {
         facturaCod: string,
         esRegalia: boolean,
     ): Promise<void> {
+        const ahora = new Date();
         const operacion = esRegalia
             ? `Se ha registrado en la factura ${facturaCod} como regalía.`
             : `Se ha registrado en la factura ${facturaCod} como venta.`;
@@ -309,8 +327,8 @@ export class InventarioVentasService {
             `INSERT INTO historial_articulos (
                 articulo_id, operacion, user_id, referencia,
                 created_at, updated_at
-            ) VALUES (?, ?, ?, ?, NOW(), NOW())`,
-            [articuloId, operacion, userId, facturaCod],
+            ) VALUES (?, ?, ?, ?, ?, ?)`,
+            [articuloId, operacion, userId, facturaCod, ahora, ahora],
         );
     }
 

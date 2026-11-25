@@ -1,4 +1,3 @@
-
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { randomInt } from 'node:crypto';
 import { EntityManager } from 'typeorm';
@@ -26,13 +25,16 @@ export class AuthDocumentosService {
             const existente = await manager.query('SELECT id FROM auth_documentos WHERE token = ? LIMIT 1', [token]);
             if (existente.length) continue;
 
-            const expiracion = new Date(Date.now() + 3 * 60 * 60 * 1000);
+            const ahora = new Date();
+            const expiracion = new Date(ahora.getTime() + 3 * 60 * 60 * 1000);
+
             const resultado = await manager.query(`
                 INSERT INTO auth_documentos (token, user_id, expiracion, estado, created_at, updated_at)
-                VALUES (?, ?, ?, 0, NOW(), NOW())
-            `, [token, userId, this.fechaMySQL(expiracion)]);
+                VALUES (?, ?, ?, 0, ?, ?)
+            `, [token, userId, this.fechaMySQL(expiracion), ahora, ahora]);
 
             this.logger.log(`[AUTH_DOCUMENTOS] Credencial creada. ID=${resultado.insertId}, usuario=${userId}`);
+
             return { id: String(resultado.insertId), token, expiracion };
         }
 

@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Arqueo de caja</title>
+
+    <style>
+        @page {
+            size: Letter;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 9px;
+            line-height: 1.25;
+            color: #1e293b;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        /* ======================================
+           ENCABEZADO
+        ====================================== */
+
+        .encabezado {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 7px;
+            border-bottom: 2px solid #17365d;
+            break-inside: avoid;
+        }
+
+        .empresa {
+            font-size: 17px;
+            font-weight: 800;
+            color: #17365d;
+            letter-spacing: .6px;
+        }
+
+        .sucursal {
+            font-size: 9px;
+            margin-top: 3px;
+            color: #64748b;
+        }
+
+        .documento-titulo {
+            text-align: right;
+        }
+
+        .documento-titulo h1 {
+            font-size: 15px;
+            color: #17365d;
+            margin: 0 0 2px;
+        }
+
+        .documento-titulo span {
+            font-size: 8px;
+            color: #64748b;
+        }
+
+        /* ======================================
+           INFORMACIÓN GENERAL
+        ====================================== */
+
+        .informacion {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            border: 1px solid #dce3eb;
+            margin-top: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            break-inside: avoid;
+        }
+
+        .campo {
+            padding: 5px 8px;
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            min-width: 0;
+        }
+
+        .campo:nth-child(3n) {
+            border-right: 0;
+        }
+
+        .campo:nth-last-child(-n+3) {
+            border-bottom: 0;
+        }
+
+        .campo label {
+            display: block;
+            font-size: 7px;
+            text-transform: uppercase;
+            color: #64748b;
+            margin-bottom: 2px;
+        }
+
+        .campo strong {
+            display: block;
+            font-size: 10px;
+            color: #17365d;
+            overflow-wrap: anywhere;
+        }
+
+        /* ======================================
+           TÍTULOS DE SECCIONES
+        ====================================== */
+
+        .titulo-seccion {
+            font-size: 10px;
+            font-weight: bold;
+            color: #17365d;
+            margin: 11px 0 5px;
+            text-transform: uppercase;
+            letter-spacing: .4px;
+            break-after: avoid;
+            page-break-after: avoid;
+        }
+
+        /* ======================================
+           RESUMEN DE OPERACIONES
+        ====================================== */
+
+        .resumen {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            break-inside: avoid;
+        }
+
+        .resumen-item {
+            border: 1px solid #dce3eb;
+            border-radius: 4px;
+            padding: 6px 8px;
+            background: #f8fafc;
+        }
+
+        .resumen-item label {
+            display: block;
+            font-size: 7.5px;
+            color: #64748b;
+            margin-bottom: 3px;
+        }
+
+        .resumen-item strong {
+            display: block;
+            font-size: 13px;
+            color: #17365d;
+        }
+
+        .resumen-item.ingreso strong {
+            color: #166534;
+        }
+
+        .resumen-item.egreso strong {
+            color: #b91c1c;
+        }
+
+        .resumen-item.efectivo {
+            background: #edf4ff;
+            border-color: #c8d9ef;
+        }
+
+        /* ======================================
+           DETALLE DE EFECTIVO
+        ====================================== */
+
+        .contabilidad {
+            display: flex;
+            align-items: flex-start;
+            width: 100%;
+            gap: 7px;
+        }
+
+        .columna {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .tabla-titulo {
+            padding: 5px 6px;
+            color: #fff;
+            font-size: 9px;
+            font-weight: bold;
+            text-align: center;
+            border-radius: 3px 3px 0 0;
+            break-after: avoid;
+        }
+
+        .tabla-ingresos {
+            background: #166534;
+        }
+
+        .tabla-egresos {
+            background: #991b1b;
+        }
+
+        .tabla-general-titulo {
+            background: #17365d;
+            text-align: left;
+            padding: 6px 8px;
+        }
+
+        /* ======================================
+           CONFIGURACIÓN DE TABLAS
+        ====================================== */
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 7.5px;
+        }
+
+        thead {
+            display: table-header-group;
+        }
+
+        tfoot {
+            display: table-row-group;
+        }
+
+        th {
+            padding: 4px 4px;
+            text-align: left;
+            background: #edf2f7;
+            color: #475569;
+            border-bottom: 1px solid #cbd5e1;
+            font-size: 7.5px;
+        }
+
+        td {
+            padding: 3.5px 4px;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: middle;
+            overflow-wrap: anywhere;
+            line-height: 1.25;
+        }
+
+        tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        tbody tr:nth-child(even) {
+            background: #f8fafc;
+        }
+
+        .hora {
+            width: 17%;
+        }
+
+        .referencia {
+            width: 25%;
+        }
+
+        .concepto {
+            width: 35%;
+        }
+
+        .importe {
+            width: 23%;
+            text-align: right;
+        }
+
+        .monto {
+            text-align: right;
+            white-space: nowrap;
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .sin-movimientos {
+            text-align: center;
+            color: #94a3b8;
+            padding: 10px 5px;
+        }
+
+        .total-tabla {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 6px;
+            border-top: 1.5px solid #94a3b8;
+            background: #f1f5f9;
+            font-size: 9px;
+            font-weight: bold;
+            break-inside: avoid;
+        }
+
+        .nota-tabla {
+            font-size: 7px;
+            color: #64748b;
+            margin-top: 4px;
+            line-height: 1.35;
+        }
+
+        /* ======================================
+           TABLA GENERAL DE MOVIMIENTOS
+        ====================================== */
+
+        .tabla-general {
+            border: 1px solid #dce3eb;
+            font-size: 8px;
+        }
+
+        .tabla-general th {
+            padding: 5px 5px;
+            font-size: 8px;
+        }
+
+        .tabla-general td {
+            padding: 4px 5px;
+        }
+
+        .general-hora {
+            width: 11%;
+        }
+
+        .general-referencia {
+            width: 19%;
+        }
+
+        .general-concepto {
+            width: 28%;
+        }
+
+        .general-forma-pago {
+            width: 18%;
+        }
+
+        .general-debe {
+            width: 12%;
+            text-align: right;
+        }
+
+        .general-haber {
+            width: 12%;
+            text-align: right;
+        }
+
+        .debe {
+            color: #166534;
+        }
+
+        .haber {
+            color: #b91c1c;
+        }
+
+        .monto-vacio {
+            color: #94a3b8;
+            font-weight: normal;
+        }
+
+        .movimiento-pendiente {
+            font-size: 7px;
+            color: #92400e;
+        }
+
+        .encabezado-debe {
+            color: #166534;
+            background: #eaf5ee;
+        }
+
+        .encabezado-haber {
+            color: #991b1b;
+            background: #fcecec;
+        }
+
+        .totales-generales td {
+            padding: 6px 5px;
+            font-size: 9px;
+            font-weight: bold;
+            background: #edf2f7;
+            border-top: 1.5px solid #94a3b8;
+        }
+
+        .saldo-general td {
+            padding: 6px 5px;
+            font-size: 9px;
+            font-weight: bold;
+            color: #17365d;
+            background: #edf4ff;
+            border-top: 1px solid #c8d9ef;
+        }
+
+        /* ======================================
+           DECLARACIÓN Y CONCILIACIÓN
+        ====================================== */
+
+        .declaracion {
+            margin-top: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            overflow: hidden;
+            break-inside: avoid;
+        }
+
+        .declaracion-titulo {
+            background: #17365d;
+            color: white;
+            padding: 6px 8px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .declaracion-fila {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .declaracion-fila strong {
+            font-size: 11px;
+        }
+
+        .resultado {
+            padding: 7px 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+        }
+
+        .resultado strong {
+            font-size: 13px;
+        }
+
+        .cuadrado {
+            background: #ecfdf3;
+            color: #166534;
+        }
+
+        .sobrante {
+            background: #fff7df;
+            color: #92400e;
+        }
+
+        .faltante {
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
+        /* ======================================
+           OBSERVACIONES
+        ====================================== */
+
+        .observacion {
+            margin-top: 8px;
+            padding: 6px 8px;
+            border: 1px solid #dce3eb;
+            border-radius: 4px;
+            break-inside: avoid;
+        }
+
+        .observacion label {
+            font-size: 8px;
+            color: #17365d;
+            font-weight: bold;
+        }
+
+        .observacion p {
+            margin: 4px 0 0;
+            min-height: 12px;
+            line-height: 1.35;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .aviso {
+            margin-top: 6px;
+            padding: 5px 7px;
+            background: #fff7df;
+            border: 1px solid #e8d29c;
+            color: #92400e;
+            font-size: 8px;
+            line-height: 1.35;
+            break-inside: avoid;
+        }
+
+        /* ======================================
+           FIRMAS
+        ====================================== */
+
+        .firmas {
+            display: flex;
+            justify-content: space-between;
+            gap: 35px;
+            margin-top: 0;
+            padding-top: 27px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .firma {
+            flex: 1;
+            text-align: center;
+            border-top: 1px solid #334155;
+            padding-top: 4px;
+        }
+
+        .firma strong {
+            display: block;
+            font-size: 9px;
+        }
+
+        .firma small {
+            display: block;
+            color: #64748b;
+            margin-top: 2px;
+            font-size: 8px;
+        }
+
+        /* ======================================
+           PIE DEL DOCUMENTO
+        ====================================== */
+
+        .pie {
+            margin-top: 9px;
+            padding-top: 5px;
+            border-top: 1px solid #dce3eb;
+            display: flex;
+            justify-content: space-between;
+            font-size: 7px;
+            color: #64748b;
+        }
+
+        .cierre-final {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+    </style>
+</head>
+
+<body>
+
+<!-- ======================================
+     ENCABEZADO
+====================================== -->
+
+<header class="encabezado">
+
+    <div>
+        <div class="empresa">{{EMPRESA}}</div>
+        <div class="sucursal">{{SUCURSAL}}</div>
+    </div>
+
+    <div class="documento-titulo">
+        <h1>ARQUEO DE CAJA</h1>
+        <span>Control interno de efectivo y operaciones</span>
+    </div>
+
+</header>
+
+<!-- ======================================
+     INFORMACIÓN GENERAL
+====================================== -->
+
+<section class="informacion">
+
+    <div class="campo">
+        <label>Sucursal</label>
+        <strong>{{SUCURSAL}}</strong>
+    </div>
+
+    <div class="campo">
+        <label>Caja</label>
+        <strong>{{CAJA}} · Caja {{NUM_CAJA}}</strong>
+    </div>
+
+    <div class="campo">
+        <label>Fecha del cierre</label>
+        <strong>{{FECHA_CIERRE}}</strong>
+    </div>
+
+    <div class="campo">
+        <label>Usuario responsable del cierre</label>
+        <strong>{{USUARIO}}</strong>
+    </div>
+
+    <div class="campo">
+        <label>Hora de registro del cierre</label>
+        <strong>{{HORA_REGISTRO}}</strong>
+    </div>
+
+    <div class="campo">
+        <label>Fecha y hora de impresión</label>
+        <strong>{{FECHA_GENERACION}}</strong>
+    </div>
+
+</section>
+
+<!-- ======================================
+     RESUMEN DE OPERACIONES
+====================================== -->
+
+<h2 class="titulo-seccion">Resumen de operaciones</h2>
+
+<section class="resumen">
+
+    <div class="resumen-item">
+        <label>Total general de ingresos</label>
+        <strong>{{TOTAL}}</strong>
+    </div>
+
+    <div class="resumen-item ingreso">
+        <label>Ingresos en efectivo</label>
+        <strong>{{INGRESO}}</strong>
+    </div>
+
+    <div class="resumen-item egreso">
+        <label>Egresos de efectivo</label>
+        <strong>{{EGRESO}}</strong>
+    </div>
+
+    <div class="resumen-item efectivo">
+        <label>Efectivo esperado</label>
+        <strong>{{EFECTIVO}}</strong>
+    </div>
+
+</section>
+
+<!-- ======================================
+     MOVIMIENTOS DE EFECTIVO
+====================================== -->
+
+<h2 class="titulo-seccion">Detalle de movimientos de efectivo</h2>
+
+<section class="contabilidad">
+
+    <div class="columna">
+
+        <div class="tabla-titulo tabla-ingresos">
+            INGRESOS · {{CANTIDAD_INGRESOS}} MOVIMIENTOS
+        </div>
+
+        <table>
+            <thead>
+            <tr>
+                <th class="hora">Hora</th>
+                <th class="referencia">Referencia</th>
+                <th class="concepto">Concepto</th>
+                <th class="importe">Importe</th>
+            </tr>
+            </thead>
+
+            <tbody>
+            {{MOVIMIENTOS_INGRESOS}}
+            </tbody>
+        </table>
+
+        <div class="total-tabla">
+            <span>Total ingresos</span>
+            <span>{{TOTAL_INGRESOS_DETALLE}}</span>
+        </div>
+
+    </div>
+
+    <div class="columna">
+
+        <div class="tabla-titulo tabla-egresos">
+            EGRESOS · {{CANTIDAD_EGRESOS}} MOVIMIENTOS
+        </div>
+
+        <table>
+            <thead>
+            <tr>
+                <th class="hora">Hora</th>
+                <th class="referencia">Referencia</th>
+                <th class="concepto">Concepto</th>
+                <th class="importe">Importe</th>
+            </tr>
+            </thead>
+
+            <tbody>
+            {{MOVIMIENTOS_EGRESOS}}
+            </tbody>
+        </table>
+
+        <div class="total-tabla">
+            <span>Total egresos</span>
+            <span>{{TOTAL_EGRESOS_DETALLE}}</span>
+        </div>
+
+    </div>
+
+</section>
+
+<div class="nota-tabla">
+    Detalle exclusivo de los movimientos que afectan el efectivo.
+    No incluye pagos con tarjeta ni el registro del propio cierre de caja.
+</div>
+
+<!-- ======================================
+     DETALLE GENERAL DE MOVIMIENTOS
+====================================== -->
+
+<h2 class="titulo-seccion">Detalle general de movimientos</h2>
+
+<div class="tabla-titulo tabla-general-titulo">
+    TODAS LAS FORMAS DE PAGO · {{CANTIDAD_GENERALES}} MOVIMIENTOS
+</div>
+
+<table class="tabla-general">
+
+    <thead>
+    <tr>
+        <th class="general-hora">Hora</th>
+        <th class="general-referencia">Referencia</th>
+        <th class="general-concepto">Concepto</th>
+        <th class="general-forma-pago">Forma de pago</th>
+        <th class="general-debe encabezado-debe">Debe</th>
+        <th class="general-haber encabezado-haber">Haber</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    {{MOVIMIENTOS_GENERALES}}
+    </tbody>
+
+    <tfoot>
+
+    <tr class="totales-generales">
+        <td colspan="4">TOTALES GENERALES</td>
+        <td class="monto debe">{{TOTAL_DEBE}}</td>
+        <td class="monto haber">{{TOTAL_HABER}}</td>
+    </tr>
+
+    <tr class="saldo-general">
+        <td colspan="4">MOVIMIENTO NETO GENERAL (DEBE - HABER)</td>
+        <td colspan="2" class="monto">{{SALDO_GENERAL}}</td>
+    </tr>
+
+    </tfoot>
+
+</table>
+
+<div class="nota-tabla">
+    El Debe representa las entradas registradas y el Haber las salidas.
+    Incluye todas las formas de pago. El movimiento neto general no representa
+    necesariamente el efectivo disponible en caja.
+    Se excluye el registro del propio cierre.
+</div>
+
+{{AVISO_DIFERENCIA}}
+
+<!-- ======================================
+     DECLARACIÓN DE EFECTIVO
+====================================== -->
+
+<section class="declaracion">
+
+    <div class="declaracion-titulo">
+        DECLARACIÓN Y CONCILIACIÓN DE EFECTIVO
+    </div>
+
+    <div class="declaracion-fila">
+        <span>Efectivo esperado según el sistema</span>
+        <strong>{{EFECTIVO}}</strong>
+    </div>
+
+    <div class="declaracion-fila">
+        <span>Efectivo declarado por el responsable</span>
+        <strong>{{EFECTIVO_DECLARADO}}</strong>
+    </div>
+
+    <div class="resultado {{CLASE_ARQUEO}}">
+        <span>{{ESTADO_ARQUEO}}</span>
+        <strong>{{DESCUADRE}}</strong>
+    </div>
+
+</section>
+
+<!-- ======================================
+     OBSERVACIONES Y FIRMAS
+====================================== -->
+
+<div class="cierre-final">
+
+    <section class="observacion">
+
+        <label>OBSERVACIONES DEL RESPONSABLE DE CAJA</label>
+
+        <p>{{OBSERVACION}}</p>
+
+    </section>
+
+    <section class="firmas">
+
+        <div class="firma">
+            <strong>{{USUARIO}}</strong>
+            <small>Firma del responsable de caja</small>
+        </div>
+
+        <div class="firma">
+            <strong>Revisado por</strong>
+            <small>Administración / Contabilidad</small>
+        </div>
+
+    </section>
+
+    <footer class="pie">
+        <span>Documento generado por Tilk Cloud</span>
+        <span>{{FECHA_GENERACION}}</span>
+    </footer>
+
+</div>
+
+</body>
+</html>

@@ -1,5 +1,4 @@
-
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { CajaController } from './caja.controller.js';
@@ -18,11 +17,11 @@ import { DocumentosModule } from '../documentos/documentos.module.js';
 
 import { FormasPagoController } from './formas-pago/formas-pago.controller.js';
 import { FormasPagoService } from './formas-pago/formas-pago.service.js';
-import { CarritosRemisionesService} from "../clientes/carritos_compras/carritos-remisiones.service.js";
+import { CarritosRemisionesService } from '../clientes/carritos_compras/carritos-remisiones.service.js';
 import { CajaVentaContadoValidacionService } from './venta-contado/caja-venta-contado-validacion.service.js';
 import { InventarioVentasService } from '../inventario/inventario-ventas.service.js';
 import { CajaVentaContadoProcesarService } from './venta-contado/caja-venta-contado-procesar.service.js';
-
+import { CajaVentaContadoSeriesService } from './venta-contado/caja-venta-contado-series.service.js';
 
 import {
     Cajas,
@@ -61,17 +60,21 @@ import { NotasCreditoClientesModule } from '../notas-credito-clientes/notas-cred
 
 import { CajaVentaContadoController } from './venta-contado/caja-venta-contado.controller.js';
 import { CajaVentaContadoService } from './venta-contado/caja-venta-contado.service.js';
-import { InventarioMotocicletasService} from "../inventario/inventario-motocicletas.service.js";
+import { InventarioMotocicletasService } from '../inventario/inventario-motocicletas.service.js';
 import { CarritosImpuestosService } from '../clientes/carritos_compras/carritos-impuestos.service.js';
 import { ClientesService } from '../clientes/clientes.service.js';
 import { NotasCreditoDisponiblesService } from '../clientes/notas_credito_clientes/notas-credito-disponibles.service.js';
 import { CajaVentaContadoIntegracionService } from './venta-contado/caja-venta-contado-integracion.service.js';
-import { DocumentosService} from "../documentos/documentos.service.js";
+import { DocumentosService } from '../documentos/documentos.service.js';
 import { VentasModule } from '../ventas/ventas.module.js';
 import { PagosContratosModule } from '../ventas/pagos_contratos/pagos_contratos.module.js';
 import { FacturasContadosModule } from '../ventas/facturas_contados/facturas-contados.module.js';
+import { OrdenEntregaVentasService } from '../ventas/inventario/orden-entrega-ventas.service.js';
+import { FacturaPdfService } from '../documentos/caja/factura-pdf.service.js';
 
-
+import { CajaCierresService } from './caja-cierres.service.js';
+import { CajaCierresConsultaService } from './caja-cierres-consulta.service.js';
+import { CajaCierresDocumentoService } from './caja-cierres-documento.service.js';
 
 @Module({
     imports: [
@@ -92,12 +95,11 @@ import { FacturasContadosModule } from '../ventas/facturas_contados/facturas-con
         PermisosModule,
         ColaboradoresModule,
         AuthDocumentosModule,
-        DocumentosModule,
+        forwardRef(() => DocumentosModule),
         NotasCreditoClientesModule,
         VentasModule,
         PagosContratosModule,
         FacturasContadosModule,
-
     ],
 
     controllers: [
@@ -107,7 +109,7 @@ import { FacturasContadosModule } from '../ventas/facturas_contados/facturas-con
 
         // Venta de contado
         CajaVentaContadoController,
-        CajaAnticiposController
+        CajaAnticiposController,
     ],
 
     providers: [
@@ -119,6 +121,7 @@ import { FacturasContadosModule } from '../ventas/facturas_contados/facturas-con
         CajaDistribucionService,
         CajaOperacionPagoService,
         ClientesService,
+        CajaCierresDocumentoService,
         NotasCreditoDisponiblesService,
 
         // ====================================
@@ -161,7 +164,17 @@ import { FacturasContadosModule } from '../ventas/facturas_contados/facturas-con
         InventarioVentasService,
         CajaVentaContadoProcesarService,
         CajaVentaContadoIntegracionService,
-        DocumentosService
+        CajaVentaContadoSeriesService,
+        DocumentosService,
+        OrdenEntregaVentasService,
+        FacturaPdfService,
+
+        // ====================================
+        // CIERRES DE CAJA
+        // ====================================
+
+        CajaCierresService,
+        CajaCierresConsultaService,
     ],
 
     exports: [
@@ -171,6 +184,7 @@ import { FacturasContadosModule } from '../ventas/facturas_contados/facturas-con
 
         // Compartido con otros módulos
         CajaVentaContadoService,
+        DocumentosModule,
     ],
 })
 export class CajaModule {}

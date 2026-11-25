@@ -1,17 +1,10 @@
-import {
-    Injectable,
-    Logger,
-    BadRequestException,
-    NotFoundException,
-    ConflictException,
-    InternalServerErrorException,
-} from '@nestjs/common';
-
+import { Injectable, Logger, BadRequestException, NotFoundException, ConflictException, InternalServerErrorException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import puppeteer from 'puppeteer';
 import QRCode from 'qrcode';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { fechaHonduras } from '../../../common/helpers/fecha.helper.js';
 
 interface AnticipoRow {
     codigo: string;
@@ -65,16 +58,10 @@ export class CajaAnticiposPdfService {
     }
 
     private fechaHoraGeneracion(): string {
-        return new Intl.DateTimeFormat('es-HN', {
-            timeZone: 'America/Tegucigalpa',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false,
-        }).format(new Date());
+        const { fecha, hora } = fechaHonduras();
+        const [anio, mes, dia] = fecha.split('-');
+
+        return `${dia}/${mes}/${anio}, ${hora}`;
     }
 
     private valorDe(fila: Record<string, unknown> | undefined, campos: string[]): string {
@@ -93,7 +80,7 @@ export class CajaAnticiposPdfService {
         const filas = await this.dataSource.query(
             `SELECT * FROM ${tabla}
              WHERE id = ?
-             LIMIT 1`,
+                 LIMIT 1`,
             [id],
         );
 
@@ -103,11 +90,11 @@ export class CajaAnticiposPdfService {
     private async buscarQr(codigo: string): Promise<string | null> {
         const filas = await this.dataSource.query(
             `
-            SELECT token
-            FROM verificacion_documentos
-            WHERE referencia = ?
-            ORDER BY id DESC
-            LIMIT 1
+                SELECT token
+                FROM verificacion_documentos
+                WHERE referencia = ?
+                ORDER BY id DESC
+                    LIMIT 1
             `,
             [codigo],
         );
@@ -159,65 +146,65 @@ export class CajaAnticiposPdfService {
 
             const filas = await this.dataSource.query(
                 `
-                SELECT
-                    r.codigo,
-                    DATE_FORMAT(r.fecha, '%Y-%m-%d') AS fecha,
-                    r.hora,
-                    r.total,
-                    r.pago,
-                    r.observacion,
-                    r.caja_id,
-                    r.user_id,
+                    SELECT
+                        r.codigo,
+                        DATE_FORMAT(r.fecha, '%Y-%m-%d') AS fecha,
+                        r.hora,
+                        r.total,
+                        r.pago,
+                        r.observacion,
+                        r.caja_id,
+                        r.user_id,
 
-                    c.nombres AS cliente_nombres,
-                    c.apellidos AS cliente_apellidos,
-                    c.identidad AS cliente_identidad,
+                        c.nombres AS cliente_nombres,
+                        c.apellidos AS cliente_apellidos,
+                        c.identidad AS cliente_identidad,
 
-                    nc.codigo AS nota_codigo,
-                    nc.monto AS nota_monto,
-                    nc.uso,
-                    DATE_FORMAT(
-                        nc.fecha_vencimiento,
-                        '%Y-%m-%d'
-                    ) AS fecha_vencimiento,
+                        nc.codigo AS nota_codigo,
+                        nc.monto AS nota_monto,
+                        nc.uso,
+                        DATE_FORMAT(
+                                nc.fecha_vencimiento,
+                                '%Y-%m-%d'
+                            ) AS fecha_vencimiento,
 
-                    s.nombre AS sucursal_nombre,
-                    s.abreviatura AS sucursal_abreviatura,
-                    s.cod AS sucursal_cod,
-                    s.direccion_completa AS sucursal_direccion,
-                    s.telefono AS sucursal_telefono,
-                    s.email AS sucursal_email,
+                        s.nombre AS sucursal_nombre,
+                        s.abreviatura AS sucursal_abreviatura,
+                        s.cod AS sucursal_cod,
+                        s.direccion_completa AS sucursal_direccion,
+                        s.telefono AS sucursal_telefono,
+                        s.email AS sucursal_email,
 
-                    fp.nombre AS forma_pago
+                        fp.nombre AS forma_pago
 
-                FROM recibos r
+                    FROM recibos r
 
-                INNER JOIN historial_cajas hc
-                    ON hc.recibo_id = r.id
-                    AND hc.tipo_documento = 5
-                    AND hc.tipo = 0
-                    AND hc.cajas_id = r.caja_id
+                             INNER JOIN historial_cajas hc
+                                        ON hc.recibo_id = r.id
+                                            AND hc.tipo_documento = 5
+                                            AND hc.tipo = 0
+                                            AND hc.cajas_id = r.caja_id
 
-                INNER JOIN nota_credito_clientes nc
-                    ON nc.recibo_id = r.id
-                    AND nc.origen = 'CAJA'
+                             INNER JOIN nota_credito_clientes nc
+                                        ON nc.recibo_id = r.id
+                                            AND nc.origen = 'CAJA'
 
-                INNER JOIN anticipo_clientes ac
-                    ON ac.id = nc.anticipo_cliente_id
-                    AND ac.recibo_id = r.id
+                             INNER JOIN anticipo_clientes ac
+                                        ON ac.id = nc.anticipo_cliente_id
+                                            AND ac.recibo_id = r.id
 
-                INNER JOIN clientes c
-                    ON c.id = nc.cliente_id
+                             INNER JOIN clientes c
+                                        ON c.id = nc.cliente_id
 
-                INNER JOIN sucursals s
-                    ON s.id = r.sucursal_id
+                             INNER JOIN sucursals s
+                                        ON s.id = r.sucursal_id
 
-                INNER JOIN forma_pagos fp
-                    ON fp.id = hc.forma_pago_id
+                             INNER JOIN forma_pagos fp
+                                        ON fp.id = hc.forma_pago_id
 
-                WHERE r.codigo = ?
+                    WHERE r.codigo = ?
 
-                LIMIT 2
+                        LIMIT 2
                 `,
                 [codigoLimpio],
             ) as AnticipoRow[];

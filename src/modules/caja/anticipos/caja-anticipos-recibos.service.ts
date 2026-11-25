@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, Logger } from '@nes
 import { EntityManager } from 'typeorm';
 import { PostearCuentaDirectrizService } from '../postear_cuenta/postear-cuenta-directriz.service.js';
 import { PostearCuentaMontoLetrasService } from '../postear_cuenta/postear-cuenta-monto-letras.service.js';
+import { fechaHonduras } from '../../../common/helpers/fecha.helper.js';
 
 export interface CrearReciboAnticipo {
     user_id: string;
@@ -19,26 +20,6 @@ export class CajaAnticiposRecibosService {
         private readonly directrizService: PostearCuentaDirectrizService,
         private readonly montoLetrasService: PostearCuentaMontoLetrasService,
     ) {}
-
-    private fechaHoraHonduras() {
-        const partes = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/Tegucigalpa',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hourCycle: 'h23',
-        }).formatToParts(new Date());
-
-        const obtener = (tipo: string) => partes.find(parte => parte.type === tipo)?.value ?? '';
-
-        return {
-            fecha: `${obtener('year')}-${obtener('month')}-${obtener('day')}`,
-            hora: `${obtener('hour')}:${obtener('minute')}:${obtener('second')}`,
-        };
-    }
 
     async crearRecibo(manager: EntityManager, datos: CrearReciboAnticipo) {
         if (!manager.queryRunner?.isTransactionActive) {
@@ -76,7 +57,7 @@ export class CajaAnticiposRecibosService {
 
         if (existentes.length) throw new ConflictException(`El recibo ${codigo} ya existe.`);
 
-        const { fecha, hora } = this.fechaHoraHonduras();
+        const { fecha, hora, created_at, updated_at } = fechaHonduras();
         const pagoLetras = this.montoLetrasService.convertir(total);
 
         const resultado = await manager.query(`
@@ -87,13 +68,14 @@ export class CajaAnticiposRecibosService {
                 total_capital, total_interes, total_mora,
                 created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             null, codigo, fecha, hora, observacion,
             total, datos.user_id, pagoLetras,
             datos.sucursal_id, datos.caja_id,
             total, '0.00', '1',
             0, 0, 0,
+            created_at, updated_at,
         ]);
 
         if (!resultado.insertId) {

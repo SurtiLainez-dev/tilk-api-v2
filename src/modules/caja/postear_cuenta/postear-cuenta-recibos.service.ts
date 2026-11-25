@@ -1,10 +1,10 @@
-
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { AuthDocumentosService } from '../../auth-documentos/auth-documentos.service.js';
 import { VerificarDocumentosQrService } from '../../auth-documentos/verificar-documentos-qr.service.js';
 import { PostearCuentaDirectrizService } from './postear-cuenta-directriz.service.js';
 import { PostearCuentaMontoLetrasService } from './postear-cuenta-monto-letras.service.js';
+import { fechaHonduras } from '../../../common/helpers/fecha.helper.js';
 
 export interface MovimientoCuerpoRecibo {
     pago_id: string;
@@ -27,7 +27,6 @@ export interface CrearReciboPosteo {
 @Injectable()
 export class PostearCuentaRecibosService {
     private readonly logger = new Logger(PostearCuentaRecibosService.name);
-    private readonly zonaHoraria = 'America/Tegucigalpa';
 
     constructor(
         private readonly directrizService: PostearCuentaDirectrizService,
@@ -47,19 +46,6 @@ export class PostearCuentaRecibosService {
 
     private validarId(valor: string, campo: string): void {
         if (!/^[1-9]\d*$/.test(String(valor))) throw new BadRequestException(`El campo ${campo} no es válido.`);
-    }
-
-    private fechaHoraHonduras(): { fecha: string; hora: string } {
-        const partes = new Intl.DateTimeFormat('en-US', {
-            timeZone: this.zonaHoraria, year: 'numeric', month: '2-digit', day: '2-digit',
-            hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
-        }).formatToParts(new Date());
-
-        const obtener = (tipo: string) => partes.find(parte => parte.type === tipo)?.value ?? '';
-        return {
-            fecha: `${obtener('year')}-${obtener('month')}-${obtener('day')}`,
-            hora: `${obtener('hour')}:${obtener('minute')}:${obtener('second')}`,
-        };
     }
 
     async crearRecibo(manager: EntityManager, datos: CrearReciboPosteo) {
@@ -108,7 +94,7 @@ export class PostearCuentaRecibosService {
             const existente = await manager.query('SELECT id FROM recibos WHERE codigo = ? LIMIT 1', [codigo]);
             if (existente.length) throw new ConflictException(`El código de recibo ${codigo} ya existe.`);
 
-            const { fecha, hora } = this.fechaHoraHonduras();
+            const { fecha, hora, created_at, updated_at } = fechaHonduras();
             const total = totalCentavos / 100;
             const pagoLetras = this.montoLetrasService.convertir(total);
             const totalMora = datos.movimientos.filter(m => m.tipo === 2).reduce((suma, m) => suma + this.centavos(m.monto, 'mora'), 0) / 100;
@@ -120,11 +106,11 @@ export class PostearCuentaRecibosService {
                     venta_id, codigo, fecha, hora, observacion, total, user_id, pago,
                     sucursal_id, caja_id, saldo_actual_venta, saldo_nuevo, file,
                     total_capital, total_interes, total_mora, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
                 datos.venta_id, codigo, fecha, hora, datos.observacion, total, datos.user_id,
                 pagoLetras, datos.sucursal_id, datos.caja_id, saldoAnterior / 100,
-                saldoNuevo / 100, '1', 0, 0, totalMora,
+                saldoNuevo / 100, '1', 0, 0, totalMora, created_at, updated_at,
             ]);
 
             if (!resultado.insertId) throw new ConflictException('No se pudo crear el recibo.');
@@ -149,8 +135,11 @@ export class PostearCuentaRecibosService {
                     INSERT INTO cuerpo_recibos (
                         recibo_id, pagos_contrato_id, tipo, detalle,
                         total_capital, total_interes, total_mora, total, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-                `, [reciboId, movimiento.pago_id, movimiento.tipo, detalle, 0, 0, movimiento.tipo === 2 ? monto : 0, monto]);
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `, [
+                    reciboId, movimiento.pago_id, movimiento.tipo, detalle,
+                    0, 0, movimiento.tipo === 2 ? monto : 0, monto, created_at, updated_at,
+                ]);
 
                 if (!resultadoCuerpo.insertId) throw new ConflictException('No se pudo registrar el cuerpo del recibo.');
                 this.logger.debug(`[RECIBO] Movimiento creado. Pago=${movimiento.pago_id}, tipo=${movimiento.tipo}, monto=${monto}`);

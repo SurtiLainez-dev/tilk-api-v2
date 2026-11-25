@@ -1,36 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
-
-import {
-    NotaCreditoClienteContadores,
-} from '../../database/entities/index.js';
+import { NotaCreditoClienteContadores } from '../../database/entities/index.js';
 
 @Injectable()
 export class NotasCreditoContadoresService {
 
-    async siguiente(
-        manager: EntityManager,
-        clienteId: string,
-    ): Promise<number> {
+    async siguiente(manager: EntityManager, clienteId: string): Promise<number> {
 
-        await manager.query(
-            `
+        const ahora = new Date();
+
+        await manager.query(`
             INSERT INTO nota_credito_cliente_contadores (
                 cliente_id,
                 contador_actual,
                 created_at,
                 updated_at
             )
-            VALUES (?, 0, NOW(), NOW())
+            VALUES (?, 0, ?, ?)
             ON DUPLICATE KEY UPDATE
                 cliente_id = cliente_id
-            `,
-            [clienteId],
-        );
+        `, [clienteId, ahora, ahora]);
 
-        const repository = manager.getRepository(
-            NotaCreditoClienteContadores,
-        );
+        const repository = manager.getRepository(NotaCreditoClienteContadores);
 
         const registro = await repository.findOneOrFail({
             where: {
@@ -41,9 +32,7 @@ export class NotasCreditoContadoresService {
             },
         });
 
-        registro.contador_actual =
-            Number(registro.contador_actual) + 1;
-
+        registro.contador_actual = Number(registro.contador_actual) + 1;
         registro.updated_at = new Date();
 
         await repository.save(registro);

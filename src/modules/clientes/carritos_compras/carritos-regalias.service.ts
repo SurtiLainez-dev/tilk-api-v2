@@ -1,10 +1,4 @@
-
-import {
-    BadRequestException,
-    ConflictException,
-    Injectable,
-    NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { CarritosConsultasService } from './carritos-consultas.service.js';
 
@@ -38,7 +32,7 @@ export class CarritosRegaliasService {
             SELECT id, slug, estado, tipo
             FROM carrito_compras
             WHERE slug = ? AND sucursal_id = ?
-            LIMIT 1
+                LIMIT 1
             FOR UPDATE
         `, [carritoSlug, sucursalId]);
 
@@ -57,7 +51,7 @@ export class CarritosRegaliasService {
               AND ccc.carrito_compra_id = ?
               AND ccc.estado = 1
               AND COALESCE(ccc.es_regalia, 0) = 0
-            LIMIT 1
+                LIMIT 1
         `, [lineaId, carritoId]);
 
         if (!filas.length) throw new NotFoundException('No se encontró la línea principal activa.');
@@ -66,6 +60,7 @@ export class CarritosRegaliasService {
 
     async consultar(carritoSlug: string, sucursalId: string) {
         const detalle = await this.consultas.obtenerDetalle(carritoSlug, sucursalId);
+
         return {
             success: true,
             message: 'Regalías consultadas correctamente.',
@@ -78,7 +73,9 @@ export class CarritosRegaliasService {
 
     async agregar(carritoSlug: string, dto: GuardarRegaliaDto, sucursalId: string, userId: string) {
         if (!dto.articulo_slug?.trim()) throw new BadRequestException('Se requiere el artículo.');
+
         const cantidad = this.validarCantidad(dto.cantidad);
+
         if (cantidad === 0) throw new BadRequestException('Una regalía nueva debe tener cantidad mayor que cero.');
 
         await this.dataSource.transaction(async manager => {
@@ -111,6 +108,8 @@ export class CarritosRegaliasService {
                 throw new ConflictException('Esta regalía ya está registrada para el artículo principal. Actualiza su cantidad.');
             }
 
+            const ahora = new Date();
+
             const resultado = await manager.query(`
                 INSERT INTO cuerpo_carrito_compras (
                     carrito_compra_id,
@@ -132,9 +131,9 @@ export class CarritosRegaliasService {
                 ) VALUES (
                     ?, ?, ?, 0, 0, 0, 0, 0, 0, 0,
                     1, 'PENDIENTE_APROBACION', 'REGALIA', 1,
-                    NOW(), NOW()
+                    ?, ?
                 )
-            `, [carrito.id, articuloId, cantidad]);
+            `, [carrito.id, articuloId, cantidad, ahora, ahora]);
 
             const lineaRegaliaId = resultado.insertId;
 
@@ -146,8 +145,8 @@ export class CarritosRegaliasService {
                     user_id,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, ?, NOW(), NOW())
-            `, [carrito.id, dto.linea_principal_id, lineaRegaliaId, userId]);
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            `, [carrito.id, dto.linea_principal_id, lineaRegaliaId, userId, ahora, ahora]);
         });
 
         const detalle = await this.consultas.obtenerDetalle(carritoSlug, sucursalId);
@@ -188,17 +187,19 @@ export class CarritosRegaliasService {
                 throw new ConflictException('No se puede modificar una regalía aprobada.');
             }
 
+            const ahora = new Date();
+
             await manager.query(`
                 UPDATE cuerpo_carrito_compras
-                SET cantidad = ?, updated_at = NOW()
+                SET cantidad = ?, updated_at = ?
                 WHERE id = ? AND carrito_compra_id = ?
-            `, [cantidad, lineaRegaliaId, carrito.id]);
+            `, [cantidad, ahora, lineaRegaliaId, carrito.id]);
 
             await manager.query(`
                 UPDATE carrito_compra_regalias
-                SET user_id = ?, updated_at = NOW()
+                SET user_id = ?, updated_at = ?
                 WHERE id = ?
-            `, [userId, filas[0].id]);
+            `, [userId, ahora, filas[0].id]);
         });
 
         const detalle = await this.consultas.obtenerDetalle(carritoSlug, sucursalId);

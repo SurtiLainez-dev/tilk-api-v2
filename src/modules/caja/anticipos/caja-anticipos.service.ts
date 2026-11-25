@@ -6,7 +6,8 @@ import { CajaSesionService } from '../caja-sesion.service.js';
 import { CajaAnticiposRecibosService } from './caja-anticipos-recibos.service.js';
 import { PostearCuentaHistorialCajaService } from '../postear_cuenta/postear-cuenta-historial-caja.service.js';
 import { NotasCreditoContadoresService } from '../../notas-credito-clientes/notas-credito-contadores.service.js';
-import { CrearAnticipoDto} from "./dto/crear-anticipo.dto.js";
+import { CrearAnticipoDto } from './dto/crear-anticipo.dto.js';
+import { fechaHonduras } from '../../../common/helpers/fecha.helper.js';
 
 @Injectable()
 export class CajaAnticiposService {
@@ -79,12 +80,12 @@ export class CajaAnticiposService {
                 c.slug AS cliente_slug,
                 CONCAT_WS(' ', c.nombres, c.apellidos) AS cliente_nombre
             FROM nota_credito_clientes nc
-            LEFT JOIN anticipo_clientes a ON a.id = nc.anticipo_cliente_id
-            LEFT JOIN recibos r ON r.id = nc.recibo_id
-            LEFT JOIN clientes c ON c.id = nc.cliente_id
+                     LEFT JOIN anticipo_clientes a ON a.id = nc.anticipo_cliente_id
+                     LEFT JOIN recibos r ON r.id = nc.recibo_id
+                     LEFT JOIN clientes c ON c.id = nc.cliente_id
             WHERE nc.operacion_uuid = ?
-            LIMIT 1
-            ${bloquear ? 'FOR UPDATE' : ''}
+                LIMIT 1
+                  ${bloquear ? 'FOR UPDATE' : ''}
         `, [uuid]);
 
         return registros[0] ?? null;
@@ -168,9 +169,7 @@ export class CajaAnticiposService {
     async registrar(dto: CrearAnticipoDto, token: string, usuarioId: string) {
         const userId = this.validarId(usuarioId, 'user_id');
 
-        // ======================================
         // 1. VALIDAR SESIÓN DE CAJA
-        // ======================================
 
         if (typeof token !== 'string' || !token.trim()) {
             throw new UnauthorizedException('No se recibió el token de sesión de caja.');
@@ -184,9 +183,7 @@ export class CajaAnticiposService {
 
         const cajaId = this.validarId(sesion.data.caja_id, 'caja_id');
 
-        // ======================================
         // 2. VALIDAR DATOS DEL ANTICIPO
-        // ======================================
 
         const clienteSlug = dto.cliente_slug?.trim();
         const monto = this.normalizarMonto(dto.monto);
@@ -211,9 +208,7 @@ export class CajaAnticiposService {
             throw new BadRequestException('El identificador de operación no es válido.');
         }
 
-        // ======================================
         // 3. GENERAR HASH DE LA OPERACIÓN
-        // ======================================
 
         const hash = createHash('sha256').update(JSON.stringify({
             tipo: 'ANTICIPO_CAJA',
@@ -226,9 +221,7 @@ export class CajaAnticiposService {
             observacion,
         })).digest('hex');
 
-        // ======================================
         // 4. VERIFICAR OPERACIÓN EXISTENTE
-        // ======================================
 
         const existente = await this.obtenerOperacion(this.dataSource.manager, uuid);
 
@@ -240,15 +233,14 @@ export class CajaAnticiposService {
 
         try {
 
-            // ==================================
             // 5. INICIAR TRANSACCIÓN
-            // ==================================
 
             return await this.dataSource.transaction(async manager => {
 
-                // ==============================
+                const ahora = new Date();
+                const { fecha } = fechaHonduras(ahora);
+
                 // 6. BUSCAR Y BLOQUEAR CLIENTE
-                // ==============================
 
                 const clientes = await manager.query(`
                     SELECT id, slug, nombres, apellidos
@@ -266,9 +258,7 @@ export class CajaAnticiposService {
 
                 const clienteId = this.validarId(cliente.id, 'cliente_id');
 
-                // ==============================
                 // 7. VERIFICAR DUPLICADOS
-                // ==============================
 
                 const operacionExistente = await this.obtenerOperacion(manager, uuid, true);
 
@@ -276,9 +266,7 @@ export class CajaAnticiposService {
                     return this.validarOperacionExistente(operacionExistente, hash, userId, cajaId);
                 }
 
-                // ==============================
                 // 8. VALIDAR Y BLOQUEAR CAJA
-                // ==============================
 
                 const cajas = await manager.query(`
                     SELECT id, slug, user_id, sucursal_id, total
@@ -304,9 +292,7 @@ export class CajaAnticiposService {
 
                 const sucursalId = this.validarId(caja.sucursal_id, 'sucursal_id');
 
-                // ==============================
                 // 9. VALIDAR FORMA DE PAGO
-                // ==============================
 
                 const formas = await manager.query(`
                     SELECT id, nombre
@@ -326,9 +312,7 @@ export class CajaAnticiposService {
                     throw new BadRequestException('La forma de pago no está habilitada para anticipos.');
                 }
 
-                // ==============================
                 // 10. VALIDAR TIPO DE NOTA
-                // ==============================
 
                 const tipos = await manager.query(`
                     SELECT id, nombre
@@ -341,9 +325,7 @@ export class CajaAnticiposService {
                     throw new ConflictException('No se encontró el tipo de nota de crédito ANTICIPOS.');
                 }
 
-                // ==============================
                 // 11. CREAR RECIBO
-                // ==============================
 
                 const recibo = await this.recibosService.crearRecibo(manager, {
                     user_id: userId,
@@ -353,9 +335,7 @@ export class CajaAnticiposService {
                     observacion,
                 });
 
-                // ==============================
                 // 12. CREAR ANTICIPO
-                // ==============================
 
                 const anticipoSlug = randomUUID();
 
@@ -377,7 +357,7 @@ export class CajaAnticiposService {
                     )
                     VALUES (
                         ?, ?, NULL, ?, ?, 1, NULL, ?,
-                        'NOTA_CREDITO', ?, NULL, NOW(), NOW()
+                        'NOTA_CREDITO', ?, NULL, ?, ?
                     )
                 `, [
                     anticipoSlug,
@@ -386,6 +366,8 @@ export class CajaAnticiposService {
                     monto,
                     recibo.recibo_id,
                     uso,
+                    ahora,
+                    ahora,
                 ]);
 
                 if (!anticipo.insertId) {
@@ -394,16 +376,11 @@ export class CajaAnticiposService {
 
                 const anticipoId = String(anticipo.insertId);
 
-                // ==============================
                 // 13. REGISTRAR HISTORIAL CAJA
-                // ==============================
-                //
                 // tipo = 0: ingreso.
                 // tipo_documento = 5: anticipo.
-                //
                 // El servicio existente actualiza
                 // cajas.total cuando es efectivo.
-                // ==============================
 
                 await this.historialCajaService.registrar(manager, {
                     caja_id: cajaId,
@@ -416,9 +393,7 @@ export class CajaAnticiposService {
                     historial: null,
                 });
 
-                // ==============================
                 // 14. GENERAR CONTADOR NC
-                // ==============================
 
                 const contador = await this.contadoresService.siguiente(manager, clienteId);
                 const codigo = `NC-${clienteId}-${String(contador).padStart(6, '0')}`;
@@ -429,9 +404,7 @@ export class CajaAnticiposService {
 
                 const notaSlug = randomUUID();
 
-                // ==============================
                 // 15. CREAR NOTA DE CRÉDITO
-                // ==============================
 
                 const nota = await manager.query(`
                     INSERT INTO nota_credito_clientes (
@@ -472,16 +445,16 @@ export class CajaAnticiposService {
                         updated_at
                     )
                     VALUES (
-                               ?, ?, ?, ?, ?, NULL,
-                               ?, ?, NULL, NULL,
-                               ?, ?, NULL, 1,
-                               ?, NULL, 0, ?,
-                               1, 'SALDO_FAVOR', 'CAJA', ?,
-                               ?, 1, NULL, NULL,
-                               DATE_ADD(CURDATE(), INTERVAL 6 MONTH), NULL, NULL,
-                               ?, ?, NULL, NULL,
-                               NOW(), NOW()
-                           )
+                        ?, ?, ?, ?, ?, NULL,
+                        ?, ?, NULL, NULL,
+                        ?, ?, NULL, 1,
+                        ?, NULL, 0, ?,
+                        1, 'SALDO_FAVOR', 'CAJA', ?,
+                        ?, 1, NULL, NULL,
+                        DATE_ADD(CAST(? AS DATE), INTERVAL 6 MONTH), NULL, NULL,
+                        ?, ?, NULL, NULL,
+                        ?, ?
+                    )
                 `, [
                     notaSlug,
                     codigo,
@@ -496,17 +469,18 @@ export class CajaAnticiposService {
                     monto,
                     uso,
                     monto,
+                    fecha,
                     uuid,
                     hash,
+                    ahora,
+                    ahora,
                 ]);
 
                 if (!nota.insertId) {
                     throw new ConflictException('No se pudo generar la nota de crédito del anticipo.');
                 }
 
-                // ==============================
                 // 16. PREPARAR RESPUESTA
-                // ==============================
 
                 const resultado = await this.obtenerOperacion(manager, uuid);
 
@@ -519,10 +493,7 @@ export class CajaAnticiposService {
 
         } catch (error) {
 
-            // ==================================
-            // 17. CONTROL DE OPERACIONES
-            //     CONCURRENTES
-            // ==================================
+            // 17. CONTROL DE OPERACIONES CONCURRENTES
 
             const errorMysql = error as {
                 code?: string;

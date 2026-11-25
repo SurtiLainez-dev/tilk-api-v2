@@ -38,7 +38,7 @@ const registeredEntities = Object.values(Entities).filter(
                     database: config.getOrThrow<string>('DB_DATABASE'),
 
                     charset: 'utf8mb4',
-                    timezone: 'Z',
+                    timezone: '-06:00',
 
                     ssl: useSsl
                         ? {

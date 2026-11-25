@@ -29,7 +29,7 @@ export default new DataSource({
     database: process.env.DB_DATABASE,
 
     charset: 'utf8mb4',
-    timezone: 'Z',
+    timezone: '-06:00',
 
     ssl: useSsl
         ? {

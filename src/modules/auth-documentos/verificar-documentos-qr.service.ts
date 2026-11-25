@@ -1,4 +1,3 @@
-
 import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
 import { randomInt } from 'node:crypto';
 import { EntityManager } from 'typeorm';
@@ -33,12 +32,15 @@ export class VerificarDocumentosQrService {
             const existente = await manager.query('SELECT id FROM verificacion_documentos WHERE token = ? LIMIT 1', [token]);
             if (existente.length) continue;
 
+            const ahora = new Date();
+
             const resultado = await manager.query(`
                 INSERT INTO verificacion_documentos (url_verificacion, referencia, token, detalle, tipo, autor, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
-            `, [datos.url_verificacion, datos.referencia, token, datos.detalle, datos.tipo, datos.autor]);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `, [datos.url_verificacion, datos.referencia, token, datos.detalle, datos.tipo, datos.autor, ahora, ahora]);
 
             this.logger.log(`[QR] Documento registrado. ID=${resultado.insertId}, referencia=${datos.referencia}`);
+
             return { id: String(resultado.insertId), token, referencia: datos.referencia, tipo: datos.tipo };
         }
 

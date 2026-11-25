@@ -1,21 +1,9 @@
-
-import {
-    BadRequestException,
-    Injectable,
-    InternalServerErrorException,
-    Logger,
-    NotFoundException,
-} from '@nestjs/common';
-
+import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { randomUUID } from 'node:crypto';
-
-import {
-    DeleteObjectCommand,
-    PutObjectCommand,
-} from '@aws-sdk/client-s3';
-
+import { DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { SpacesService } from '../spaces/spaces.service.js';
+import { fechaHonduras } from '../../common/helpers/fecha.helper.js';
 
 export interface RegistrarEgresoCajaDto {
     slug: string;
@@ -28,76 +16,14 @@ export interface RegistrarEgresoCajaDto {
 
 @Injectable()
 export class CajaEgresosService {
-    private readonly logger = new Logger(
-        CajaEgresosService.name,
-    );
+    private readonly logger = new Logger(CajaEgresosService.name);
 
-    private readonly directorio =
-        'Contabilidad/caja/egreso/archivo';
+    private readonly directorio = 'Contabilidad/caja/egreso/archivo';
 
     constructor(
         private readonly dataSource: DataSource,
         private readonly spacesService: SpacesService,
     ) {}
-
-    /**
-     * Obtiene la fecha actual de Honduras.
-     *
-     * Formato: YYYY-MM-DD
-     *
-     * Independiente de la zona horaria del
-     * servidor NestJS o contenedor Docker.
-     */
-    private obtenerFechaHonduras(): string {
-        const partes = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/Tegucigalpa',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-        }).formatToParts(new Date());
-
-        const obtener = (tipo: string): string =>
-            partes.find(
-                parte => parte.type === tipo,
-            )?.value ?? '';
-
-        return [
-            obtener('year'),
-            obtener('month'),
-            obtener('day'),
-        ].join('-');
-    }
-
-    /**
-     * Obtiene fecha y hora de Honduras.
-     *
-     * Formato: YYYY-MM-DD HH:mm:ss
-     *
-     * No depende de la zona horaria
-     * del servidor NestJS.
-     */
-    private obtenerFechaHoraHonduras(): string {
-        const partes = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/Tegucigalpa',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hourCycle: 'h23',
-        }).formatToParts(new Date());
-
-        const obtener = (tipo: string): string =>
-            partes.find(
-                parte => parte.type === tipo,
-            )?.value ?? '';
-
-        return (
-            `${obtener('year')}-${obtener('month')}-${obtener('day')} ` +
-            `${obtener('hour')}:${obtener('minute')}:${obtener('second')}`
-        );
-    }
 
     /**
      * Genera una clave única para guardar
@@ -113,32 +39,21 @@ export class CajaEgresosService {
      */
     private validarPdf(archivo: Buffer): void {
         if (!Buffer.isBuffer(archivo)) {
-            throw new BadRequestException(
-                'El comprobante debe ser un archivo válido.',
-            );
+            throw new BadRequestException('El comprobante debe ser un archivo válido.');
         }
 
         if (archivo.length === 0) {
-            throw new BadRequestException(
-                'El comprobante está vacío.',
-            );
+            throw new BadRequestException('El comprobante está vacío.');
         }
 
         const limite = 15 * 1024 * 1024;
 
         if (archivo.length > limite) {
-            throw new BadRequestException(
-                'El comprobante no puede superar 15 MB.',
-            );
+            throw new BadRequestException('El comprobante no puede superar 15 MB.');
         }
 
-        if (
-            archivo.subarray(0, 5).toString('ascii') !==
-            '%PDF-'
-        ) {
-            throw new BadRequestException(
-                'El comprobante debe estar en formato PDF.',
-            );
+        if (archivo.subarray(0, 5).toString('ascii') !== '%PDF-') {
+            throw new BadRequestException('El comprobante debe estar en formato PDF.');
         }
     }
 
@@ -149,9 +64,7 @@ export class CajaEgresosService {
      *
      * Devuelve solamente la clave S3.
      */
-    private async subirComprobante(
-        archivo: Buffer,
-    ): Promise<string> {
+    private async subirComprobante(archivo: Buffer): Promise<string> {
         const key = this.generarNombreArchivo();
 
         await this.spacesService.getCliente().send(
@@ -171,9 +84,7 @@ export class CajaEgresosService {
      * Elimina el comprobante de Spaces
      * cuando falla la transacción MySQL.
      */
-    private async eliminarComprobante(
-        key: string,
-    ): Promise<void> {
+    private async eliminarComprobante(key: string): Promise<void> {
         await this.spacesService.getCliente().send(
             new DeleteObjectCommand({
                 Bucket: this.spacesService.getBucket(),
@@ -198,9 +109,7 @@ export class CajaEgresosService {
      * Si MySQL falla, intenta eliminar
      * el comprobante de Spaces.
      */
-    async registrarEgreso(
-        datos: RegistrarEgresoCajaDto,
-    ) {
+    async registrarEgreso(datos: RegistrarEgresoCajaDto) {
         const slug = datos.slug?.trim();
         const referencia = datos.referencia?.trim();
 
@@ -209,21 +118,15 @@ export class CajaEgresosService {
         // ======================================
 
         if (!slug) {
-            throw new BadRequestException(
-                'El identificador de la caja es obligatorio.',
-            );
+            throw new BadRequestException('El identificador de la caja es obligatorio.');
         }
 
         if (!referencia) {
-            throw new BadRequestException(
-                'La referencia bancaria es obligatoria.',
-            );
+            throw new BadRequestException('La referencia bancaria es obligatoria.');
         }
 
         if (referencia.length > 150) {
-            throw new BadRequestException(
-                'La referencia no puede superar 150 caracteres.',
-            );
+            throw new BadRequestException('La referencia no puede superar 150 caracteres.');
         }
 
         const monto = Number(datos.montoDepositado);
@@ -232,20 +135,13 @@ export class CajaEgresosService {
             !Number.isFinite(monto) ||
             monto <= 0 ||
             !Number.isInteger(Math.round(monto * 100)) ||
-            Math.abs(
-                monto * 100 - Math.round(monto * 100),
-            ) > 1e-7
+            Math.abs(monto * 100 - Math.round(monto * 100)) > 1e-7
         ) {
-            throw new BadRequestException(
-                'El monto debe ser mayor que cero y tener máximo dos decimales.',
-            );
+            throw new BadRequestException('El monto debe ser mayor que cero y tener máximo dos decimales.');
         }
 
         const montoCentavos = Math.round(monto * 100);
-
-        const montoNormalizado = (
-            montoCentavos / 100
-        ).toFixed(2);
+        const montoNormalizado = (montoCentavos / 100).toFixed(2);
 
         this.validarPdf(datos.comprobante);
 
@@ -253,17 +149,12 @@ export class CajaEgresosService {
         // 2. FECHA Y HORA DE HONDURAS
         // ======================================
 
-        const fecha = this.obtenerFechaHonduras();
-
-        const fechaHora =
-            this.obtenerFechaHoraHonduras();
+        const { fecha, fecha_hora_mysql: fechaHora, created_at, updated_at } = fechaHonduras();
 
         let archivoKey: string | null = null;
-
         let transaccionConfirmada = false;
 
-        const queryRunner =
-            this.dataSource.createQueryRunner();
+        const queryRunner = this.dataSource.createQueryRunner();
 
         let conexionEstablecida = false;
         let zonaOriginal: string | null = null;
@@ -273,9 +164,7 @@ export class CajaEgresosService {
             // 3. SUBIR COMPROBANTE
             // ==================================
 
-            archivoKey = await this.subirComprobante(
-                datos.comprobante,
-            );
+            archivoKey = await this.subirComprobante(datos.comprobante);
 
             // ==================================
             // 4. CONECTAR MYSQL
@@ -329,9 +218,7 @@ export class CajaEgresosService {
             const caja = cajas[0];
 
             if (!caja) {
-                throw new NotFoundException(
-                    'No se encontró la caja solicitada.',
-                );
+                throw new NotFoundException('No se encontró la caja solicitada.');
             }
 
             // ==================================
@@ -341,27 +228,17 @@ export class CajaEgresosService {
             const saldoActual = Number(caja.total);
 
             if (!Number.isFinite(saldoActual)) {
-                throw new InternalServerErrorException(
-                    'El saldo de la caja no es válido.',
-                );
+                throw new InternalServerErrorException('El saldo de la caja no es válido.');
             }
 
-            const saldoCentavos = Math.round(
-                saldoActual * 100,
-            );
+            const saldoCentavos = Math.round(saldoActual * 100);
 
             if (saldoCentavos < montoCentavos) {
-                throw new BadRequestException(
-                    'La caja no tiene saldo suficiente para registrar este egreso.',
-                );
+                throw new BadRequestException('La caja no tiene saldo suficiente para registrar este egreso.');
             }
 
-            const nuevoSaldoCentavos =
-                saldoCentavos - montoCentavos;
-
-            const nuevoSaldo = (
-                nuevoSaldoCentavos / 100
-            ).toFixed(2);
+            const nuevoSaldoCentavos = saldoCentavos - montoCentavos;
+            const nuevoSaldo = (nuevoSaldoCentavos / 100).toFixed(2);
 
             // ==================================
             // 8. DESCONTAR SALDO
@@ -370,11 +247,13 @@ export class CajaEgresosService {
             await queryRunner.query(
                 `
                 UPDATE cajas
-                SET total = ?
+                SET total = ?,
+                    updated_at = ?
                 WHERE id = ?
                 `,
                 [
                     nuevoSaldo,
+                    updated_at,
                     caja.id,
                 ],
             );
@@ -390,7 +269,7 @@ export class CajaEgresosService {
             // historial = clave privada S3
             //
             // created_at y updated_at se
-            // registran con hora de Honduras.
+            // registran mediante fechaHonduras().
             // ==================================
 
             await queryRunner.query(
@@ -430,8 +309,8 @@ export class CajaEgresosService {
                     montoNormalizado,
                     fecha,
                     archivoKey,
-                    fechaHora,
-                    fechaHora,
+                    created_at,
+                    updated_at,
                 ],
             );
 
@@ -457,8 +336,7 @@ export class CajaEgresosService {
 
             return {
                 success: true,
-                message:
-                    'Egreso registrado correctamente.',
+                message: 'Egreso registrado correctamente.',
 
                 data: {
                     fecha,
@@ -482,10 +360,7 @@ export class CajaEgresosService {
             // REVERTIR TRANSACCIÓN
             // ==================================
 
-            if (
-                queryRunner.isTransactionActive &&
-                !transaccionConfirmada
-            ) {
+            if (queryRunner.isTransactionActive && !transaccionConfirmada) {
                 try {
                     await queryRunner.rollbackTransaction();
                 } catch (rollbackError) {
@@ -502,14 +377,9 @@ export class CajaEgresosService {
             // LIMPIAR COMPROBANTE S3
             // ==================================
 
-            if (
-                archivoKey &&
-                !transaccionConfirmada
-            ) {
+            if (archivoKey && !transaccionConfirmada) {
                 try {
-                    await this.eliminarComprobante(
-                        archivoKey,
-                    );
+                    await this.eliminarComprobante(archivoKey);
                 } catch (eliminarError) {
                     this.logger.error(
                         `No se pudo limpiar el comprobante S3: ${archivoKey}`,
@@ -535,9 +405,7 @@ export class CajaEgresosService {
                 throw error;
             }
 
-            throw new InternalServerErrorException(
-                'No fue posible registrar el egreso de caja.',
-            );
+            throw new InternalServerErrorException('No fue posible registrar el egreso de caja.');
 
         } finally {
             // ==================================
@@ -548,10 +416,7 @@ export class CajaEgresosService {
             // por otros módulos de TypeORM.
             // ==================================
 
-            if (
-                conexionEstablecida &&
-                !queryRunner.isReleased
-            ) {
+            if (conexionEstablecida && !queryRunner.isReleased) {
                 try {
                     if (zonaOriginal !== null) {
                         await queryRunner.query(

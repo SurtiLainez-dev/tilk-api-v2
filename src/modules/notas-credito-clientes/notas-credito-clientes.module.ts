@@ -10,6 +10,7 @@ import { NotasCreditoRegistroService } from './notas-credito-registro.service.js
 import { NotasCreditoContadoresService } from './notas-credito-contadores.service.js';
 import { NotasCreditoConsultasService } from './notas-credito-consultas.service.js';
 import { NotasCreditoAnulacionService } from './notas-credito-anulacion.service.js';
+import { NotasCreditoAplicacionesService } from './notas-credito-aplicaciones.service.js';
 
 @Module({
     imports: [
@@ -21,14 +22,24 @@ import { NotasCreditoAnulacionService } from './notas-credito-anulacion.service.
         ]),
         SpacesModule,
     ],
-    controllers: [NotasCreditoClientesController],
+
+    controllers: [
+        NotasCreditoClientesController,
+    ],
+
     providers: [
         NotasCreditoClientesService,
         NotasCreditoRegistroService,
         NotasCreditoContadoresService,
         NotasCreditoConsultasService,
         NotasCreditoAnulacionService,
+        NotasCreditoAplicacionesService,
     ],
-    exports: [NotasCreditoClientesService, NotasCreditoContadoresService],
+
+    exports: [
+        NotasCreditoClientesService,
+        NotasCreditoContadoresService,
+        NotasCreditoAplicacionesService,
+    ],
 })
 export class NotasCreditoClientesModule {}

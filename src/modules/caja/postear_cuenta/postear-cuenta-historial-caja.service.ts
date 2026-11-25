@@ -1,10 +1,4 @@
-import {
-    BadRequestException,
-    ConflictException,
-    Injectable,
-    Logger,
-    NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 
 export interface RegistrarHistorialCaja {
@@ -50,6 +44,8 @@ export class PostearCuentaHistorialCajaService {
             const total = Number(datos.total);
             const historial = datos.historial?.trim() || null;
 
+            const esPagoNotaCredito = formaPagoId === '12' && tipo === 0 && tipoDocumento === 1 && esFactura;
+
             this.logger.log(
                 `[DATOS_NORMALIZADOS] Caja=${cajaId}, FormaPago=${formaPagoId}, ` +
                 `Recibo=${reciboId}, Factura=${facturaId}, Total=${total}, ` +
@@ -83,7 +79,9 @@ export class PostearCuentaHistorialCajaService {
 
             if (
                 !Number.isFinite(total) ||
-                total <= 0 ||
+                total < 0 ||
+                (total === 0 && !esPagoNotaCredito) ||
+                (formaPagoId === '12' && tipoDocumento === 1 && total !== 0) ||
                 Math.abs(total * 100 - Math.round(total * 100)) > 0.000001
             ) {
                 throw new BadRequestException('El total no es válido.');
@@ -93,11 +91,7 @@ export class PostearCuentaHistorialCajaService {
                 throw new BadRequestException('El tipo no es válido.');
             }
 
-            if (
-                !Number.isInteger(tipoDocumento) ||
-                tipoDocumento < 0 ||
-                tipoDocumento > 127
-            ) {
+            if (!Number.isInteger(tipoDocumento) || tipoDocumento < 0 || tipoDocumento > 127) {
                 throw new BadRequestException('El tipo de documento no es válido.');
             }
 
@@ -113,15 +107,12 @@ export class PostearCuentaHistorialCajaService {
 
             this.logger.log(`[BUSCAR_CAJA] Consultando caja ID=${cajaId}`);
 
-            const cajas = await manager.query(
-                `
-SELECT id, total
-FROM cajas
-WHERE id = ?
-    FOR UPDATE
-        `,
-                [cajaId],
-            );
+            const cajas = await manager.query(`
+                SELECT id, total
+                FROM cajas
+                WHERE id = ?
+                FOR UPDATE
+            `, [cajaId]);
 
             if (!cajas.length) {
                 throw new NotFoundException('No se encontró la caja.');
@@ -142,15 +133,12 @@ WHERE id = ?
             if (reciboId !== null) {
                 this.logger.log(`[BUSCAR_RECIBO] Consultando recibo ID=${reciboId}`);
 
-                const recibos = await manager.query(
-                    `
-SELECT id, codigo, total, caja_id
-FROM recibos
-WHERE id = ?
-    LIMIT 1
-        `,
-                    [reciboId],
-                );
+                const recibos = await manager.query(`
+                    SELECT id, codigo, total, caja_id
+                    FROM recibos
+                    WHERE id = ?
+                    LIMIT 1
+                `, [reciboId]);
 
                 if (!recibos.length) {
                     throw new NotFoundException('No se encontró el recibo.');
@@ -164,30 +152,26 @@ WHERE id = ?
                     throw new BadRequestException('El recibo no corresponde a la caja.');
                 }
 
+                // Validación original de recibos.
                 if (Math.round(Number(recibo.total) * 100) !== Math.round(total * 100)) {
                     throw new BadRequestException('El total no coincide con el recibo.');
                 }
 
                 referencia = String(recibo.codigo);
+
             } else {
                 this.logger.log(`[BUSCAR_FACTURA] Consultando factura ID=${facturaId}`);
 
-                const facturas = await manager.query(
-                    `
-SELECT
-fv.id,
-    fv.contador,
-    fv.total,
-    fv.caja_id,
-    di.codigo AS codigo_directriz
-FROM factura_ventas fv
-LEFT JOIN directrices__impresions di
-ON di.id = fv.directrices__impresion_id
-WHERE fv.id = ?
-    LIMIT 1
-        `,
-                    [facturaId],
-                );
+                const facturas = await manager.query(`
+                    SELECT
+                        fv.id,
+                        fv.contador,
+                        fv.total,
+                        fv.caja_id
+                    FROM factura_ventas fv
+                    WHERE fv.id = ?
+                    LIMIT 1
+                `, [facturaId]);
 
                 if (!facturas.length) {
                     throw new NotFoundException('No se encontró la factura.');
@@ -201,8 +185,29 @@ WHERE fv.id = ?
                     throw new BadRequestException('La factura no corresponde a la caja.');
                 }
 
-                if (Math.round(Number(factura.total) * 100) !== Math.round(total * 100)) {
-                    throw new BadRequestException('El total no coincide con la factura.');
+                // ==========================================
+                // VALIDAR TOTAL DE LA FACTURA
+                // ==========================================
+
+                if (esPagoNotaCredito) {
+                    // Las notas de crédito liquidan la factura,
+                    // pero no representan un ingreso monetario.
+
+                    if (total !== 0) {
+                        throw new BadRequestException('El movimiento de caja por notas de crédito debe ser cero.');
+                    }
+
+                    this.logger.log(
+                        `[PAGO_NOTAS_CREDITO] Factura=${facturaId}, ` +
+                        `TotalFactura=${factura.total}, TotalHistorial=${total.toFixed(2)}`,
+                    );
+
+                } else {
+                    // Validación original para las demás formas de pago.
+
+                    if (Math.round(Number(factura.total) * 100) !== Math.round(total * 100)) {
+                        throw new BadRequestException('El total no coincide con la factura.');
+                    }
                 }
 
                 referencia = datos.referencia?.trim() || String(factura.contador);
@@ -217,24 +222,18 @@ WHERE fv.id = ?
             // ==========================================
 
             const existentes = reciboId !== null
-                ? await manager.query(
-                    `
-SELECT id
-FROM historial_cajas
-WHERE recibo_id = ?
-    LIMIT 1
-        `,
-                    [reciboId],
-                )
-                : await manager.query(
-                    `
-SELECT id
-FROM historial_cajas
-WHERE factura_id = ?
-    LIMIT 1
-        `,
-                    [facturaId],
-                );
+                ? await manager.query(`
+                    SELECT id
+                    FROM historial_cajas
+                    WHERE recibo_id = ?
+                    LIMIT 1
+                `, [reciboId])
+                : await manager.query(`
+                    SELECT id
+                    FROM historial_cajas
+                    WHERE factura_id = ?
+                    LIMIT 1
+                `, [facturaId]);
 
             this.logger.log(`[DUPLICADOS] Registros encontrados=${existentes.length}`);
 
@@ -252,15 +251,12 @@ WHERE factura_id = ?
 
             this.logger.log(`[BUSCAR_FORMA_PAGO] ID=${formaPagoId}`);
 
-            const formas = await manager.query(
-                `
-SELECT id, nombre
-FROM forma_pagos
-WHERE id = ?
-    LIMIT 1
-        `,
-                [formaPagoId],
-            );
+            const formas = await manager.query(`
+                SELECT id, nombre
+                FROM forma_pagos
+                WHERE id = ?
+                LIMIT 1
+            `, [formaPagoId]);
 
             if (!formas.length) {
                 throw new NotFoundException('No se encontró la forma de pago.');
@@ -310,37 +306,34 @@ WHERE id = ?
                 tipo,
             })}`);
 
-            const insertado = await manager.query(
-                `
-INSERT INTO historial_cajas (
-    cajas_id,
-    forma_pago_id,
-    referencia,
-    tipo_documento,
-    recibo_id,
-    factura_id,
-    total,
-    fecha,
-    tipo,
-    historial,
-    created_at,
-    updated_at
-)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-    `,
-                [
-                    cajaId,
-                    formaPagoId,
+            const insertado = await manager.query(`
+                INSERT INTO historial_cajas (
+                    cajas_id,
+                    forma_pago_id,
                     referencia,
-                    tipoDocumento,
-                    reciboId,
-                    facturaId,
-                    total.toFixed(2),
+                    tipo_documento,
+                    recibo_id,
+                    factura_id,
+                    total,
                     fecha,
                     tipo,
                     historial,
-                ],
-            );
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            `, [
+                cajaId,
+                formaPagoId,
+                referencia,
+                tipoDocumento,
+                reciboId,
+                facturaId,
+                total.toFixed(2),
+                fecha,
+                tipo,
+                historial,
+            ]);
 
             this.logger.log(
                 `[RESULTADO_INSERT] InsertId=${insertado.insertId}, ` +
@@ -374,16 +367,13 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                     `SaldoEsperado=${(Number(saldoAnteriorCaja ?? 0) + total).toFixed(2)}`,
                 );
 
-                const actualizado = await manager.query(
-                    `
-UPDATE cajas
-SET
-total = ROUND(COALESCE(total, 0) + ?, 2),
-    updated_at = NOW()
-WHERE id = ?
-    `,
-                    [total.toFixed(2), cajaId],
-                );
+                const actualizado = await manager.query(`
+                    UPDATE cajas
+                    SET
+                        total = ROUND(COALESCE(total, 0) + ?, 2),
+                        updated_at = NOW()
+                    WHERE id = ?
+                `, [total.toFixed(2), cajaId]);
 
                 this.logger.log(`[RESULTADO_UPDATE_CAJA] ${JSON.stringify(actualizado)}`);
 
@@ -391,14 +381,11 @@ WHERE id = ?
                     throw new ConflictException('No se pudo actualizar el saldo de la caja.');
                 }
 
-                const saldo = await manager.query(
-                    `
-    SELECT total
-FROM cajas
-WHERE id = ?
-    `,
-                    [cajaId],
-                );
+                const saldo = await manager.query(`
+                    SELECT total
+                    FROM cajas
+                    WHERE id = ?
+                `, [cajaId]);
 
                 saldoCaja = Number(saldo[0].total).toFixed(2);
 
@@ -407,6 +394,7 @@ WHERE id = ?
                     `SaldoAnterior=${saldoAnteriorCaja}, ` +
                     `Incremento=${total.toFixed(2)}, SaldoNuevo=${saldoCaja}`,
                 );
+
             } else {
                 this.logger.warn(
                     `[CAJA_NO_ACTUALIZADA] No se ejecutó UPDATE cajas. ` +
@@ -419,14 +407,11 @@ WHERE id = ?
             // VERIFICAR SALDO FINAL
             // ==========================================
 
-            const verificacionFinal = await manager.query(
-                `
-SELECT id, total
-FROM cajas
-WHERE id = ?
-    `,
-                [cajaId],
-            );
+            const verificacionFinal = await manager.query(`
+                SELECT id, total
+                FROM cajas
+                WHERE id = ?
+            `, [cajaId]);
 
             this.logger.log(
                 `[VERIFICACION_FINAL_CAJA] ${JSON.stringify(verificacionFinal[0])}`,
@@ -468,6 +453,7 @@ WHERE id = ?
             this.logger.log('========== FIN HISTORIAL CAJA ==========');
 
             return respuesta;
+
         } catch (error) {
             const detalle = error as {
                 message?: string;

@@ -1,21 +1,12 @@
-
-import {
-    BadRequestException,
-    ConflictException,
-    Injectable,
-    NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
-
 import { AgregarArticuloCarritoDto } from './dto/gregar-articulo-carrito.dto.js';
 
 type Fila = Record<string, any>;
 
 @Injectable()
 export class CarritosArticulosService {
-    constructor(
-        private readonly dataSource: DataSource,
-    ) {}
+    constructor(private readonly dataSource: DataSource) {}
 
     private numero(valor: unknown): number {
         const resultado = Number(valor);
@@ -23,24 +14,15 @@ export class CarritosArticulosService {
     }
 
     private dinero(valor: unknown): number {
-        return Math.round(
-            (this.numero(valor) + Number.EPSILON) * 100,
-        ) / 100;
+        return Math.round((this.numero(valor) + Number.EPSILON) * 100) / 100;
     }
 
-    private async obtenerCarritoBloqueado(
-        manager: EntityManager,
-        slug: string,
-        sucursalId?: string,
-    ): Promise<Fila> {
+    private async obtenerCarritoBloqueado(manager: EntityManager, slug: string, sucursalId?: string): Promise<Fila> {
         if (!slug?.trim()) {
-            throw new BadRequestException(
-                'Se requiere el slug del carrito.',
-            );
+            throw new BadRequestException('Se requiere el slug del carrito.');
         }
 
         const parametros: unknown[] = [slug];
-
         let filtroSucursal = '';
 
         if (sucursalId) {
@@ -48,54 +30,38 @@ export class CarritosArticulosService {
             parametros.push(sucursalId);
         }
 
-        const filas: Fila[] = await manager.query(
-            `
+        const filas: Fila[] = await manager.query(`
             SELECT *
             FROM carrito_compras
             WHERE slug = ?
               ${filtroSucursal}
             LIMIT 1
             FOR UPDATE
-            `,
-            parametros,
-        );
+        `, parametros);
 
         const carrito = filas[0];
 
         if (!carrito) {
-            throw new NotFoundException(
-                'No se encontró el carrito solicitado.',
-            );
+            throw new NotFoundException('No se encontró el carrito solicitado.');
         }
 
         if (carrito.estado !== 'ABIERTO') {
-            throw new ConflictException(
-                'El carrito no está abierto y no puede modificarse.',
-            );
+            throw new ConflictException('El carrito no está abierto y no puede modificarse.');
         }
 
         if (this.numero(carrito.estado_visible) !== 1) {
-            throw new ConflictException(
-                'El carrito no está disponible para modificaciones.',
-            );
+            throw new ConflictException('El carrito no está disponible para modificaciones.');
         }
 
         return carrito;
     }
 
-    private async obtenerArticulo(
-        manager: EntityManager,
-        slug: string,
-        validarMotocicleta = true,
-    ): Promise<Fila> {
+    private async obtenerArticulo(manager: EntityManager, slug: string, validarMotocicleta = true): Promise<Fila> {
         if (!slug?.trim()) {
-            throw new BadRequestException(
-                'Se requiere el slug del artículo.',
-            );
+            throw new BadRequestException('Se requiere el slug del artículo.');
         }
 
-        const filas: Fila[] = await manager.query(
-            `
+        const filas: Fila[] = await manager.query(`
             SELECT
                 id,
                 slug,
@@ -106,141 +72,91 @@ export class CarritosArticulosService {
             FROM articulos
             WHERE slug = ?
             LIMIT 1
-            `,
-            [slug],
-        );
+        `, [slug]);
 
         const articulo = filas[0];
 
         if (!articulo) {
-            throw new NotFoundException(
-                'El artículo solicitado no existe.',
-            );
+            throw new NotFoundException('El artículo solicitado no existe.');
         }
 
         return articulo;
     }
 
-    private async obtenerPrecio(
-        manager: EntityManager,
-        precioId: string | number,
-        articuloId: string | number,
-    ): Promise<Fila> {
+    private async obtenerPrecio(manager: EntityManager, precioId: string | number, articuloId: string | number): Promise<Fila> {
         if (!/^[1-9]\d*$/.test(String(precioId))) {
-            throw new BadRequestException(
-                'El identificador del precio no es válido.',
-            );
+            throw new BadRequestException('El identificador del precio no es válido.');
         }
 
-        const filas: Fila[] = await manager.query(
-            `
+        const filas: Fila[] = await manager.query(`
             SELECT *
             FROM tk2_precios
             WHERE id = ?
               AND articulo_id = ?
               AND estado = 1
             LIMIT 1
-            `,
-            [precioId, articuloId],
-        );
+        `, [precioId, articuloId]);
 
         const precio = filas[0];
 
         if (!precio) {
-            throw new NotFoundException(
-                'El precio base no existe, está inactivo o no pertenece al artículo.',
-            );
+            throw new NotFoundException('El precio base no existe, está inactivo o no pertenece al artículo.');
         }
 
         if (this.dinero(precio.precio_contado) <= 0) {
-            throw new BadRequestException(
-                'El artículo no tiene un precio de contado válido.',
-            );
+            throw new BadRequestException('El artículo no tiene un precio de contado válido.');
         }
 
-        if (
-            !Number.isFinite(Number(precio.precio_costo)) ||
-            Number(precio.precio_costo) < 0
-        ) {
-            throw new BadRequestException(
-                'El precio de costo del artículo no es válido.',
-            );
+        if (!Number.isFinite(Number(precio.precio_costo)) || Number(precio.precio_costo) < 0) {
+            throw new BadRequestException('El precio de costo del artículo no es válido.');
         }
 
         return precio;
     }
 
-    private async obtenerLineasBloqueadas(
-        manager: EntityManager,
-        carritoId: string | number,
-        articuloId: string | number,
-    ): Promise<Fila[]> {
-        return manager.query(
-            `
+    private async obtenerLineasBloqueadas(manager: EntityManager, carritoId: string | number, articuloId: string | number): Promise<Fila[]> {
+        return manager.query(`
             SELECT *
             FROM cuerpo_carrito_compras
             WHERE carrito_compra_id = ?
               AND articulo_id = ?
             ORDER BY id ASC
             FOR UPDATE
-            `,
-            [carritoId, articuloId],
-        );
+        `, [carritoId, articuloId]);
     }
 
-    private async actualizarTotalesCarrito(
-        manager: EntityManager,
-        carritoId: string | number,
-    ): Promise<void> {
-        const filas: Fila[] = await manager.query(
-            `
+    private async actualizarTotalesCarrito(manager: EntityManager, carritoId: string | number): Promise<void> {
+        const filas: Fila[] = await manager.query(`
             SELECT
-                COALESCE(
-                    ROUND(SUM(subtotal), 2),
-                    0
-                ) AS subtotal,
-                COALESCE(
-                    ROUND(SUM(descuento_monto), 2),
-                    0
-                ) AS descuento,
-                COALESCE(
-                    ROUND(SUM(total), 2),
-                    0
-                ) AS total_neto
+                COALESCE(ROUND(SUM(subtotal), 2), 0) AS subtotal,
+                COALESCE(ROUND(SUM(descuento_monto), 2), 0) AS descuento,
+                COALESCE(ROUND(SUM(total), 2), 0) AS total_neto
             FROM cuerpo_carrito_compras
             WHERE carrito_compra_id = ?
               AND estado = 1
-            `,
-            [carritoId],
-        );
+        `, [carritoId]);
 
         const totales = filas[0];
 
-        await manager.query(
-            `
+        await manager.query(`
             UPDATE carrito_compras
             SET
                 subtotal = ?,
                 descuento = ?,
                 total_neto = ?,
-                updated_at = CURRENT_TIMESTAMP
+                updated_at = ?
             WHERE id = ?
-            `,
-            [
-                this.dinero(totales.subtotal),
-                this.dinero(totales.descuento),
-                this.dinero(totales.total_neto),
-                carritoId,
-            ],
-        );
+        `, [
+            this.dinero(totales.subtotal),
+            this.dinero(totales.descuento),
+            this.dinero(totales.total_neto),
+            new Date(),
+            carritoId,
+        ]);
     }
 
-    private async obtenerCarritoActualizado(
-        manager: EntityManager,
-        carritoId: string | number,
-    ): Promise<object> {
-        const carritos: Fila[] = await manager.query(
-            `
+    private async obtenerCarritoActualizado(manager: EntityManager, carritoId: string | number): Promise<object> {
+        const carritos: Fila[] = await manager.query(`
             SELECT
                 cc.slug,
                 cc.nombre,
@@ -257,20 +173,15 @@ export class CarritosArticulosService {
                 ON c.id = cc.cliente_id
             WHERE cc.id = ?
             LIMIT 1
-            `,
-            [carritoId],
-        );
+        `, [carritoId]);
 
         const carrito = carritos[0];
 
         if (!carrito) {
-            throw new NotFoundException(
-                'No se encontró el carrito actualizado.',
-            );
+            throw new NotFoundException('No se encontró el carrito actualizado.');
         }
 
-        const lineas: Fila[] = await manager.query(
-            `
+        const lineas: Fila[] = await manager.query(`
             SELECT
                 ccc.tk2_precio_id,
                 ccc.tk2_precio_plan_id,
@@ -294,9 +205,7 @@ export class CarritosArticulosService {
             WHERE ccc.carrito_compra_id = ?
               AND ccc.estado = 1
             ORDER BY ccc.id ASC
-            `,
-            [carritoId],
-        );
+        `, [carritoId]);
 
         return {
             slug: carrito.slug,
@@ -306,12 +215,7 @@ export class CarritosArticulosService {
 
             cliente: {
                 slug: carrito.cliente_slug,
-                nombre_completo: [
-                    carrito.nombres,
-                    carrito.apellidos,
-                ]
-                    .filter(Boolean)
-                    .join(' '),
+                nombre_completo: [carrito.nombres, carrito.apellidos].filter(Boolean).join(' '),
             },
 
             subtotal: this.dinero(carrito.subtotal),
@@ -319,34 +223,23 @@ export class CarritosArticulosService {
             total_neto: this.dinero(carrito.total_neto),
 
             cantidad_articulos: lineas.reduce(
-                (total, linea) =>
-                    total + this.numero(linea.cantidad),
-                0,
+                (total, linea) => total + this.numero(linea.cantidad), 0,
             ),
 
             articulos: lineas.map((linea) => ({
                 articulo_slug: linea.articulo_slug,
-                tk2_precio_id:
-                    linea.tk2_precio_id === null
-                        ? null
-                        : String(linea.tk2_precio_id),
-                tk2_precio_plan_id:
-                    linea.tk2_precio_plan_id === null
-                        ? null
-                        : String(linea.tk2_precio_plan_id),
+                tk2_precio_id: linea.tk2_precio_id === null ? null : String(linea.tk2_precio_id),
+                tk2_precio_plan_id: linea.tk2_precio_plan_id === null ? null : String(linea.tk2_precio_plan_id),
                 nombre_articulo: linea.nombre_articulo,
                 modelo: linea.modelo,
                 codigo_sistema: linea.codigo_sistema,
-                es_motocicleta:
-                    this.numero(linea.is_motocicleta) === 1,
+                es_motocicleta: this.numero(linea.is_motocicleta) === 1,
                 cantidad: this.numero(linea.cantidad),
                 precio_contado: this.dinero(linea.precio_contado),
                 precio_final: this.dinero(linea.precio_final),
                 subtotal: this.dinero(linea.subtotal),
                 descuento: this.dinero(linea.descuento_monto),
-                descuento_porcentaje: this.dinero(
-                    linea.descuento_porcentaje,
-                ),
+                descuento_porcentaje: this.dinero(linea.descuento_porcentaje),
                 total: this.dinero(linea.total),
                 tipo_linea: linea.tipo_linea,
                 comentario: linea.comentario,
@@ -354,55 +247,26 @@ export class CarritosArticulosService {
         };
     }
 
-    async agregarArticulo(
-        carritoSlug: string,
-        dto: AgregarArticuloCarritoDto,
-        sucursalId?: string,
-    ): Promise<object> {
+    async agregarArticulo(carritoSlug: string, dto: AgregarArticuloCarritoDto, sucursalId?: string): Promise<object> {
         return this.dataSource.transaction(async (manager) => {
-            const carrito = await this.obtenerCarritoBloqueado(
-                manager,
-                carritoSlug,
-                sucursalId,
-            );
+            const carrito = await this.obtenerCarritoBloqueado(manager, carritoSlug, sucursalId);
 
             if (carrito.tipo !== 'CONTADO') {
-                throw new BadRequestException(
-                    'Esta operación requiere un carrito de contado.',
-                );
+                throw new BadRequestException('Esta operación requiere un carrito de contado.');
             }
 
-            const articulo = await this.obtenerArticulo(
-                manager,
-                dto.articulo_slug,
-            );
+            const articulo = await this.obtenerArticulo(manager, dto.articulo_slug);
+            const precio = await this.obtenerPrecio(manager, dto.tk2_precio_id, articulo.id);
+            const lineas = await this.obtenerLineasBloqueadas(manager, carrito.id, articulo.id);
 
-            const precio = await this.obtenerPrecio(
-                manager,
-                dto.tk2_precio_id,
-                articulo.id,
-            );
-
-            const lineas = await this.obtenerLineasBloqueadas(
-                manager,
-                carrito.id,
-                articulo.id,
-            );
-
-            const activas = lineas.filter(
-                (linea) => this.numero(linea.estado) === 1,
-            );
+            const activas = lineas.filter((linea) => this.numero(linea.estado) === 1);
 
             const precioDiferente = activas.some(
-                (linea) =>
-                    String(linea.tk2_precio_id) !==
-                    String(precio.id),
+                (linea) => String(linea.tk2_precio_id) !== String(precio.id),
             );
 
             if (precioDiferente) {
-                throw new ConflictException(
-                    'No se puede aumentar la cantidad porque este artículo ya existe con un precio base diferente.',
-                );
+                throw new ConflictException('No se puede aumentar la cantidad porque este artículo ya existe con un precio base diferente.');
             }
 
             const lineaConOtraConfiguracion = activas.some(
@@ -413,52 +277,34 @@ export class CarritosArticulosService {
             );
 
             if (lineaConOtraConfiguracion) {
-                throw new ConflictException(
-                    'El artículo ya tiene un plan o configuración diferente en el carrito.',
-                );
+                throw new ConflictException('El artículo ya tiene un plan o configuración diferente en el carrito.');
             }
 
             if (activas.length > 1) {
-                throw new ConflictException(
-                    'El artículo tiene varias líneas activas y debe revisarse antes de aumentar la cantidad.',
-                );
+                throw new ConflictException('El artículo tiene varias líneas activas y debe revisarse antes de aumentar la cantidad.');
             }
 
             const lineaExistente = activas[0] ?? null;
-
-            const precioContado = this.dinero(
-                precio.precio_contado,
-            );
-
-            const precioCosto = this.dinero(
-                precio.precio_costo,
-            );
+            const precioContado = this.dinero(precio.precio_contado);
+            const precioCosto = this.dinero(precio.precio_costo);
 
             const detallePrecio = JSON.stringify({
                 precio_costo: precioCosto,
                 precio_contado: precioContado,
             });
 
-            if (lineaExistente) {
-                const cantidadNueva =
-                    this.numero(lineaExistente.cantidad) + 1;
+            const ahora = new Date();
 
-                if (
-                    !Number.isFinite(cantidadNueva) ||
-                    cantidadNueva <= 0 ||
-                    cantidadNueva > 9999999
-                ) {
-                    throw new BadRequestException(
-                        'La cantidad resultante no es válida.',
-                    );
+            if (lineaExistente) {
+                const cantidadNueva = this.numero(lineaExistente.cantidad) + 1;
+
+                if (!Number.isFinite(cantidadNueva) || cantidadNueva <= 0 || cantidadNueva > 9999999) {
+                    throw new BadRequestException('La cantidad resultante no es válida.');
                 }
 
-                const subtotal = this.dinero(
-                    cantidadNueva * precioContado,
-                );
+                const subtotal = this.dinero(cantidadNueva * precioContado);
 
-                await manager.query(
-                    `
+                await manager.query(`
                     UPDATE cuerpo_carrito_compras
                     SET
                         cantidad = ?,
@@ -485,36 +331,33 @@ export class CarritosArticulosService {
                         cuota_calculada = 0,
                         total_credito_linea = 0,
                         preview_cuotas = NULL,
-                        updated_at = CURRENT_TIMESTAMP
+                        updated_at = ?
                     WHERE id = ?
                       AND carrito_compra_id = ?
                       AND estado = 1
-                    `,
-                    [
-                        cantidadNueva,
-                        precioCosto,
-                        precioContado,
-                        precioContado,
-                        subtotal,
-                        subtotal,
-                        detallePrecio,
-                        lineaExistente.id,
-                        carrito.id,
-                    ],
-                );
+                `, [
+                    cantidadNueva,
+                    precioCosto,
+                    precioContado,
+                    precioContado,
+                    subtotal,
+                    subtotal,
+                    detallePrecio,
+                    ahora,
+                    lineaExistente.id,
+                    carrito.id,
+                ]);
             } else {
                 const lineaInactiva = lineas.find(
                     (linea) =>
                         this.numero(linea.estado) === 0 &&
-                        String(linea.tk2_precio_id) ===
-                        String(precio.id) &&
+                        String(linea.tk2_precio_id) === String(precio.id) &&
                         linea.tk2_precio_plan_id === null &&
                         linea.tipo_linea === 'NORMAL',
                 );
 
                 if (lineaInactiva) {
-                    await manager.query(
-                        `
+                    await manager.query(`
                         UPDATE cuerpo_carrito_compras
                         SET
                             cantidad = 1,
@@ -543,24 +386,22 @@ export class CarritosArticulosService {
                             preview_cuotas = NULL,
                             comentario = NULL,
                             estado = 1,
-                            updated_at = CURRENT_TIMESTAMP
+                            updated_at = ?
                         WHERE id = ?
                           AND carrito_compra_id = ?
-                        `,
-                        [
-                            precioCosto,
-                            precioContado,
-                            precioContado,
-                            precioContado,
-                            precioContado,
-                            detallePrecio,
-                            lineaInactiva.id,
-                            carrito.id,
-                        ],
-                    );
+                    `, [
+                        precioCosto,
+                        precioContado,
+                        precioContado,
+                        precioContado,
+                        precioContado,
+                        detallePrecio,
+                        ahora,
+                        lineaInactiva.id,
+                        carrito.id,
+                    ]);
                 } else {
-                    await manager.query(
-                        `
+                    await manager.query(`
                         INSERT INTO cuerpo_carrito_compras (
                             carrito_compra_id,
                             articulo_id,
@@ -607,74 +448,49 @@ export class CarritosArticulosService {
                             0, 0, 0,
                             NULL, NULL,
                             1,
-                            CURRENT_TIMESTAMP,
-                            CURRENT_TIMESTAMP
+                            ?, ?
                         )
-                        `,
-                        [
-                            carrito.id,
-                            articulo.id,
-                            precio.id,
-                            precioCosto,
-                            precioContado,
-                            precioContado,
-                            precioContado,
-                            precioContado,
-                            detallePrecio,
-                        ],
-                    );
+                    `, [
+                        carrito.id,
+                        articulo.id,
+                        precio.id,
+                        precioCosto,
+                        precioContado,
+                        precioContado,
+                        precioContado,
+                        precioContado,
+                        detallePrecio,
+                        ahora,
+                        ahora,
+                    ]);
                 }
             }
 
-            await this.actualizarTotalesCarrito(
-                manager,
-                carrito.id,
-            );
+            await this.actualizarTotalesCarrito(manager, carrito.id);
 
             return {
                 success: true,
                 message: 'Artículo agregado correctamente.',
-                data: await this.obtenerCarritoActualizado(
-                    manager,
-                    carrito.id,
-                ),
+                data: await this.obtenerCarritoActualizado(manager, carrito.id),
             };
         });
     }
 
-    async eliminarArticulo(
-        carritoSlug: string,
-        articuloSlug: string,
-        precioId: string | number,
-        sucursalId?: string,
-    ): Promise<object> {
+    async eliminarArticulo(carritoSlug: string, articuloSlug: string, precioId: string | number, sucursalId?: string): Promise<object> {
         if (!/^[1-9]\d*$/.test(String(precioId))) {
-            throw new BadRequestException(
-                'El identificador del precio no es válido.',
-            );
+            throw new BadRequestException('El identificador del precio no es válido.');
         }
 
         return this.dataSource.transaction(async (manager) => {
-            const carrito = await this.obtenerCarritoBloqueado(
-                manager,
-                carritoSlug,
-                sucursalId,
-            );
+            const carrito = await this.obtenerCarritoBloqueado(manager, carritoSlug, sucursalId);
 
             if (carrito.tipo !== 'CONTADO') {
-                throw new BadRequestException(
-                    'Esta operación requiere un carrito de contado.',
-                );
+                throw new BadRequestException('Esta operación requiere un carrito de contado.');
             }
 
-            const articulo = await this.obtenerArticulo(
-                manager,
-                articuloSlug,
-                false,
-            );
+            const articulo = await this.obtenerArticulo(manager, articuloSlug, false);
 
-            const lineas: Fila[] = await manager.query(
-                `
+            const lineas: Fila[] = await manager.query(`
                 SELECT id
                 FROM cuerpo_carrito_compras
                 WHERE carrito_compra_id = ?
@@ -683,54 +499,32 @@ export class CarritosArticulosService {
                   AND tk2_precio_plan_id IS NULL
                   AND estado = 1
                 FOR UPDATE
-                `,
-                [
-                    carrito.id,
-                    articulo.id,
-                    precioId,
-                ],
-            );
+            `, [carrito.id, articulo.id, precioId]);
 
             if (!lineas.length) {
-                throw new NotFoundException(
-                    'No existe una línea activa con ese artículo y precio base.',
-                );
+                throw new NotFoundException('No existe una línea activa con ese artículo y precio base.');
             }
 
             if (lineas.length > 1) {
-                throw new ConflictException(
-                    'Existen varias líneas con el mismo artículo y precio. No se puede determinar cuál eliminar.',
-                );
+                throw new ConflictException('Existen varias líneas con el mismo artículo y precio. No se puede determinar cuál eliminar.');
             }
 
-            await manager.query(
-                `
+            await manager.query(`
                 UPDATE cuerpo_carrito_compras
                 SET
                     estado = 0,
-                    updated_at = CURRENT_TIMESTAMP
+                    updated_at = ?
                 WHERE id = ?
                   AND carrito_compra_id = ?
                   AND estado = 1
-                `,
-                [
-                    lineas[0].id,
-                    carrito.id,
-                ],
-            );
+            `, [new Date(), lineas[0].id, carrito.id]);
 
-            await this.actualizarTotalesCarrito(
-                manager,
-                carrito.id,
-            );
+            await this.actualizarTotalesCarrito(manager, carrito.id);
 
             return {
                 success: true,
                 message: 'Artículo eliminado correctamente.',
-                data: await this.obtenerCarritoActualizado(
-                    manager,
-                    carrito.id,
-                ),
+                data: await this.obtenerCarritoActualizado(manager, carrito.id),
             };
         });
     }
