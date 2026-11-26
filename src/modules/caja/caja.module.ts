@@ -77,6 +77,7 @@ import { CajaCierresConsultaService } from './caja-cierres-consulta.service.js';
 import { CajaCierresDocumentoService } from './caja-cierres-documento.service.js';
 import { CajaHistorialCierresController } from './caja-historial-cierres.controller.js';
 import { CajaHistorialCierresService } from './caja-historial-cierres.service.js';
+import { CajaEgresosOtroDiaService } from './egreso/caja-egresos-otro-dia.service.js';
 
 @Module({
     imports: [
@@ -179,6 +180,7 @@ import { CajaHistorialCierresService } from './caja-historial-cierres.service.js
         CajaCierresService,
         CajaCierresConsultaService,
         CajaHistorialCierresService,
+        CajaEgresosOtroDiaService
     ],
 
     exports: [

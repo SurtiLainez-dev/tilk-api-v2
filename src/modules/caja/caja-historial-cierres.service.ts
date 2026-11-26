@@ -74,6 +74,48 @@ export class CajaHistorialCierresService {
     }
 
     // ==========================================
+    // NORMALIZAR COMPROBANTES DE EGRESOS
+    // ==========================================
+
+    private normalizarEgreso(registro: any) {
+        const referencia = String(registro.referencia ?? '').trim();
+        const partes = referencia.split(' | ');
+
+        const coincidenciaCierre = partes.length >= 4
+            ? partes[2].match(/^Cierre:\s*(\d{4}-\d{2}-\d{2})$/i)
+            : null;
+
+        const coincidenciaMonto = coincidenciaCierre
+            ? partes[1].match(/^Depósito L\.\s*(\d+(?:\.\d{1,2})?)$/i)
+            : null;
+
+        const esHistorico = Number(registro.total) === 0 && !!coincidenciaCierre && !!coincidenciaMonto;
+
+        const monto = esHistorico && coincidenciaMonto
+            ? Number(coincidenciaMonto[1])
+            : Number(registro.total ?? 0);
+
+        return {
+            tipo: esHistorico ? 'DEPOSITO_HISTORICO' : 'EGRESO',
+            referencia: esHistorico ? partes[0] : referencia,
+            referencia_completa: referencia,
+            observacion: esHistorico ? partes.slice(3).join(' | ') || null : null,
+            fecha_cierre: esHistorico && coincidenciaCierre ? coincidenciaCierre[1] : String(registro.fecha),
+            fecha_deposito: String(registro.fecha),
+            monto: this.monto(monto),
+            total_registrado: this.monto(registro.total),
+            forma_pago: registro.forma_pago || 'No disponible',
+            usuario: null,
+            created_at: registro.created_at,
+            comprobante: {
+                disponible: true,
+                tipo: 'application/pdf',
+                path: String(registro.historial).trim(),
+            },
+        };
+    }
+
+    // ==========================================
     // LISTADO DE LOS ÚLTIMOS 90 DÍAS
     // ==========================================
 
@@ -185,6 +227,34 @@ export class CajaHistorialCierresService {
                 ORDER BY co.created_at DESC, co.id DESC
             `, [cierre.id]);
 
+            // ==========================================
+            // EGRESOS CON COMPROBANTES PDF
+            // ==========================================
+
+            const registrosEgresos = await manager.query(`
+                SELECT
+                    DATE_FORMAT(hc.fecha, '%Y-%m-%d') AS fecha,
+                    hc.referencia,
+                    hc.total,
+                    hc.historial,
+                    hc.created_at,
+                    fp.nombre AS forma_pago
+                FROM historial_cajas hc
+                LEFT JOIN forma_pagos fp ON fp.id = hc.forma_pago_id
+                WHERE hc.cajas_id = ?
+                  AND hc.tipo_documento = 4
+                  AND hc.tipo = 1
+                  AND hc.historial IS NOT NULL
+                  AND TRIM(hc.historial) <> ''
+                  AND LOWER(TRIM(hc.historial)) LIKE '%.pdf'
+                  AND hc.fecha >= ?
+                ORDER BY hc.fecha DESC, hc.created_at DESC, hc.id DESC
+            `, [caja, fecha]);
+
+            const egresos = registrosEgresos
+                .map((registro: any) => this.normalizarEgreso(registro))
+                .filter((egreso: ReturnType<typeof this.normalizarEgreso>) => egreso.fecha_cierre === fecha);
+
             return {
                 success: true,
                 data: {
@@ -210,6 +280,9 @@ export class CajaHistorialCierresService {
                         revision: this.booleano(comentario.revision),
                         created_at: comentario.created_at,
                     })),
+
+                    cantidad_egresos: egresos.length,
+                    egresos,
                 },
             };
         });
@@ -228,7 +301,7 @@ export class CajaHistorialCierresService {
             FROM cierre_cajas
             WHERE cajas_id = ?
               AND fecha = ?
-            LIMIT 2
+                LIMIT 2
         `, [caja, fecha]);
 
         if (!registros.length) {
